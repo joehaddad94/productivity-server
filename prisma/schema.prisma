@@ -96,7 +96,7 @@ model Task {
   workspaceId    String    @map("workspace_id")
   title          String
   description    String?
-  dueDate        DateTime? @map("due_date")
+  dueDate        DateTime? @map("due_date") @db.Date
   priority       String?
   status         String    @default("pending")
   completedAt    DateTime? @map("completed_at")
