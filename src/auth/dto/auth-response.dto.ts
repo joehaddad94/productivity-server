@@ -12,6 +12,6 @@ export class AuthResponseDto {
     name: string | null;
   };
 
-  @ApiProperty({ description: 'JWT access token for Authorization header' })
-  accessToken: string;
+  @ApiProperty({ description: 'JWT access token for Authorization header (present after login)' })
+  accessToken?: string;
 }

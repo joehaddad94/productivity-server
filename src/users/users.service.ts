@@ -8,7 +8,7 @@ export class UsersService {
 
   async findByEmail(email: string): Promise<User | null> {
     return this.prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
+      where: { email: this.normalizeEmail(email) },
     });
   }
 
@@ -16,5 +16,18 @@ export class UsersService {
     return this.prisma.user.findUnique({
       where: { id },
     });
+  }
+
+  async create(data: { email: string; name?: string }): Promise<User> {
+    return this.prisma.user.create({
+      data: {
+        email: this.normalizeEmail(data.email),
+        name: data.name ?? null,
+      },
+    });
+  }
+
+  private normalizeEmail(email: string): string {
+    return email.toLowerCase().trim();
   }
 }
