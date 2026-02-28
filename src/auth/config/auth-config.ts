@@ -1,0 +1,5 @@
+export const AUTH_CONFIG = {
+  JWT_SECRET: 'JWT_SECRET',
+  JWT_EXPIRES_IN: 'JWT_EXPIRES_IN',
+  JWT_EXPIRES_IN_DEFAULT: '14d',
+} as const;
