@@ -1,6 +1,7 @@
 // Prisma schema for Productivity App – Supabase (PostgreSQL)
 // https://pris.ly/d/prisma-schema
 
+
 generator client {
   provider = "prisma-client-js"
 }
