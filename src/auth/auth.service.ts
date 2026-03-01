@@ -11,6 +11,12 @@ import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UsersService } from '../users/users.service';
+
+/** Internal: service returns this; controller sets cookie and returns only user. */
+export interface AuthResult {
+  user: { id: string; email: string; name: string | null };
+  accessToken: string;
+}
 import { AUTH_CONFIG } from './config/auth-config';
 import { randomBytes } from 'node:crypto';
 
@@ -55,7 +61,7 @@ export class AuthService {
     return { id: session.id, expiresAt };
   }
 
-  async register(dto: RegisterDto): Promise<AuthResponseDto> {
+  async register(dto: RegisterDto): Promise<AuthResult> {
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) {
       throw new ConflictException('A user with this email already exists');
@@ -80,7 +86,7 @@ export class AuthService {
   }
 
   /** Email-only login: if user exists, create session and return JWT. */
-  async login(dto: LoginDto): Promise<AuthResponseDto> {
+  async login(dto: LoginDto): Promise<AuthResult> {
     const user = await this.usersService.findByEmail(dto.email);
     if (!user) {
       throw new UnauthorizedException('No account found for this email');
@@ -116,7 +122,7 @@ export class AuthService {
     return { magicLink };
   }
 
-  async verifyMagicLink(token: string): Promise<AuthResponseDto> {
+  async verifyMagicLink(token: string): Promise<AuthResult> {
     const record = await this.prisma.verificationToken.findUnique({
       where: { token },
     });

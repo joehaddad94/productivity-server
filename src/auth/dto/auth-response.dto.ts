@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
- * Response shape for login and register.
- * Exposes only safe user fields and the access token (no password hash, etc.).
+ * Response shape for login, register, and magic-link verify.
+ * JWT is set in HttpOnly cookie (accessToken); body returns only user.
  */
 export class AuthResponseDto {
   @ApiProperty({ description: 'Authenticated user (safe fields only)' })
@@ -11,7 +11,4 @@ export class AuthResponseDto {
     email: string;
     name: string | null;
   };
-
-  @ApiProperty({ description: 'JWT access token for Authorization header (present after login)' })
-  accessToken?: string;
 }
