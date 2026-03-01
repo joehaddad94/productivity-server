@@ -18,7 +18,7 @@ export class UsersService {
     });
   }
 
-  async create(data: { email: string; name?: string }): Promise<User> {
+  async create(data: { email: string; name?: string | null }): Promise<User> {
     return this.prisma.user.create({
       data: {
         email: this.normalizeEmail(data.email),

@@ -4,11 +4,9 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AUTH_CONFIG } from './config/auth-config';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { PASSWORD_HASHER } from './interfaces/password-hasher.interface';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { BcryptPasswordHasher } from './services/bcrypt-password-hasher.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
@@ -27,16 +25,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [
-    AuthService,
-    JwtStrategy,
-    JwtAuthGuard,
-    BcryptPasswordHasher,
-    {
-      provide: PASSWORD_HASHER,
-      useClass: BcryptPasswordHasher,
-    },
-  ],
-  exports: [AuthService, PASSWORD_HASHER, JwtModule, JwtAuthGuard],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard],
+  exports: [AuthService, JwtModule, JwtAuthGuard],
 })
 export class AuthModule {}

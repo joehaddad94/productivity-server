@@ -2,12 +2,13 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
 /**
  * User object attached to request after JWT validation.
- * Matches the safe user shape returned by auth endpoints.
+ * sessionId is the session id (jti) for logout/revocation.
  */
 export interface RequestUser {
   id: string;
   email: string;
   name: string | null;
+  sessionId: string;
 }
 
 export const CurrentUser = createParamDecorator(
