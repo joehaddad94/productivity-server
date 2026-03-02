@@ -53,17 +53,12 @@ export class AuthController {
   }
 
   @Post('register')
-  @ApiOperation({ summary: 'Register with email (no password); JWT in HttpOnly cookie' })
+  @ApiOperation({ summary: 'Register: save email, send magic link. No sign-in until user clicks link.' })
   @ApiBody({ type: RegisterDto })
-  @ApiResponse({ status: 201, description: 'User created; cookie set', type: AuthResponseDto })
+  @ApiResponse({ status: 201, description: 'User created; check email for magic link' })
   @ApiResponse({ status: 409, description: 'Email already registered' })
-  async register(
-    @Body() dto: RegisterDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<AuthResponseDto> {
-    const result = await this.authService.register(dto);
-    this.setAuthCookie(res, result.accessToken);
-    return { user: result.user };
+  async register(@Body() dto: RegisterDto): Promise<{ message: string; magicLink?: string }> {
+    return this.authService.register(dto);
   }
 
   @Post('login')
