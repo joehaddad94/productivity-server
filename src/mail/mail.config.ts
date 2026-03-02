@@ -1,5 +1,8 @@
 export const MAIL_CONFIG = {
-  RESEND_API_KEY: 'RESEND_API_KEY',
-  RESEND_FROM: 'RESEND_FROM',
-  RESEND_FROM_DEFAULT: 'Productivity <onboarding@resend.dev>',
+  SMTP_HOST: 'SMTP_HOST',
+  SMTP_PORT: 'SMTP_PORT',
+  SMTP_USER: 'SMTP_USER',
+  SMTP_PASS: 'SMTP_PASS',
+  SMTP_FROM: 'SMTP_FROM',
+  SMTP_FROM_DEFAULT: 'Productivity <noreply@gmail.com>',
 } as const;

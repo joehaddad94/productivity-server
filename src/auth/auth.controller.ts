@@ -64,7 +64,7 @@ export class AuthController {
   @Post('login')
   @ApiOperation({ summary: 'Request magic link to sign in; no session until user clicks link' })
   @ApiBody({ type: LoginDto })
-  @ApiResponse({ status: 200, description: 'Magic link sent; check email (or link in body when Resend not configured)' })
+  @ApiResponse({ status: 200, description: 'Magic link sent; check email (or link in body when SMTP not configured)' })
   @ApiResponse({ status: 401, description: 'No account for this email' })
   async login(@Body() dto: LoginDto): Promise<{ message: string; magicLink?: string }> {
     return this.authService.login(dto);
@@ -86,9 +86,9 @@ export class AuthController {
   }
 
   @Post('send-magic-link')
-  @ApiOperation({ summary: 'Send magic link to email (via Resend if RESEND_API_KEY is set)' })
+  @ApiOperation({ summary: 'Send magic link to email (via SMTP if SMTP_USER/SMTP_PASS are set)' })
   @ApiBody({ type: SendMagicLinkDto })
-  @ApiResponse({ status: 200, description: 'Magic link sent by email, or link in body when Resend not configured' })
+  @ApiResponse({ status: 200, description: 'Magic link sent by email, or link in body when SMTP not configured' })
   async sendMagicLink(@Body() dto: SendMagicLinkDto): Promise<{ magicLink?: string; message?: string }> {
     return this.authService.sendMagicLink(dto.email);
   }
