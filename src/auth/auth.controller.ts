@@ -62,17 +62,12 @@ export class AuthController {
   }
 
   @Post('login')
-  @ApiOperation({ summary: 'Login with email (no password); JWT in HttpOnly cookie' })
+  @ApiOperation({ summary: 'Request magic link to sign in; no session until user clicks link' })
   @ApiBody({ type: LoginDto })
-  @ApiResponse({ status: 200, description: 'Login successful; cookie set', type: AuthResponseDto })
+  @ApiResponse({ status: 200, description: 'Magic link sent; check email (or link in body when Resend not configured)' })
   @ApiResponse({ status: 401, description: 'No account for this email' })
-  async login(
-    @Body() dto: LoginDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<AuthResponseDto> {
-    const result = await this.authService.login(dto);
-    this.setAuthCookie(res, result.accessToken);
-    return { user: result.user };
+  async login(@Body() dto: LoginDto): Promise<{ message: string; magicLink?: string }> {
+    return this.authService.login(dto);
   }
 
   @Post('logout')

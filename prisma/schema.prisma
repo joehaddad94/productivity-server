@@ -30,6 +30,7 @@ model User {
 model VerificationToken {
   id        String   @id @default(uuid())
   email     String
+  name      String?
   token     String   @unique
   expiresAt DateTime @map("expires_at")
 
