@@ -5,7 +5,6 @@ export const AUTH_CONFIG = {
   COOKIE_NAME: 'accessToken',
 } as const;
 
-/** Parse "14d" -> seconds (for cookie maxAge). */
 export function parseExpiresInToSeconds(expiresIn: string): number {
   const match = /^(\d+)(d|h|m|s)$/.exec(expiresIn?.trim() || '');
   if (!match) return 14 * 24 * 60 * 60; // default 14 days in seconds

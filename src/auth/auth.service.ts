@@ -7,10 +7,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UsersService } from '../users/users.service';
+import { MailService } from '../mail/mail.service';
 
 /** Internal: service returns this; controller sets cookie and returns only user. */
 export interface AuthResult {
@@ -44,6 +44,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly mailService: MailService,
   ) {}
 
   /** Sign a JWT with session id (jti) for revocation. */
@@ -109,7 +110,7 @@ export class AuthService {
     await this.prisma.session.deleteMany({ where: { id: sessionId } });
   }
 
-  async sendMagicLink(email: string): Promise<{ magicLink: string }> {
+  async sendMagicLink(email: string): Promise<{ magicLink?: string; message?: string }> {
     const normalized = email.toLowerCase().trim();
     const token = randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + MAGIC_LINK_EXPIRES_MS);
@@ -118,7 +119,11 @@ export class AuthService {
     });
     const baseUrl = this.config.get('APP_URL') ?? 'http://localhost:3000';
     const magicLink = `${baseUrl}/auth/verify?token=${token}`;
-    // TODO: send email in production (e.g. Resend, SendGrid). For dev, return link.
+
+    const sent = await this.mailService.sendMagicLinkEmail(normalized, magicLink);
+    if (sent) {
+      return { message: 'If that email is registered, you will receive a magic link shortly.' };
+    }
     return { magicLink };
   }
 

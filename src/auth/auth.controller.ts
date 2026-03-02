@@ -96,10 +96,10 @@ export class AuthController {
   }
 
   @Post('send-magic-link')
-  @ApiOperation({ summary: 'Send magic link to email (dev: returns link in response)' })
+  @ApiOperation({ summary: 'Send magic link to email (via Resend if RESEND_API_KEY is set)' })
   @ApiBody({ type: SendMagicLinkDto })
-  @ApiResponse({ status: 200, description: 'Magic link created; in production send by email' })
-  async sendMagicLink(@Body() dto: SendMagicLinkDto): Promise<{ magicLink: string }> {
+  @ApiResponse({ status: 200, description: 'Magic link sent by email, or link in body when Resend not configured' })
+  async sendMagicLink(@Body() dto: SendMagicLinkDto): Promise<{ magicLink?: string; message?: string }> {
     return this.authService.sendMagicLink(dto.email);
   }
 

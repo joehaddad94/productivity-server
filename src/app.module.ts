@@ -7,6 +7,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { UsersModule } from './users/users.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
       envFilePath: ['.env.local', '.env'],
     }),
     PrismaModule,
+    MailModule,
     HealthModule,
     UsersModule,
     AuthModule,
