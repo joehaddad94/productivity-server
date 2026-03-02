@@ -7,6 +7,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { SessionService } from './services/session.service';
+import { MagicLinkService } from './services/magic-link.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
@@ -25,7 +27,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard],
+  providers: [AuthService, SessionService, MagicLinkService, JwtStrategy, JwtAuthGuard],
   exports: [AuthService, JwtModule, JwtAuthGuard],
 })
 export class AuthModule {}
