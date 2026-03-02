@@ -3,6 +3,8 @@ export const AUTH_CONFIG = {
   JWT_EXPIRES_IN: 'JWT_EXPIRES_IN',
   JWT_EXPIRES_IN_DEFAULT: '14d',
   COOKIE_NAME: 'accessToken',
+  /** When set, GET /auth/verify redirects here after setting the cookie (e.g. frontend dashboard). */
+  VERIFY_REDIRECT_URL: 'AUTH_VERIFY_REDIRECT_URL',
 } as const;
 
 export function parseExpiresInToSeconds(expiresIn: string): number {

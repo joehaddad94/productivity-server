@@ -94,9 +94,10 @@ export class AuthController {
   }
 
   @Get('verify')
-  @ApiOperation({ summary: 'Verify magic link; JWT in HttpOnly cookie' })
+  @ApiOperation({ summary: 'Verify magic link; JWT in HttpOnly cookie. Redirects to AUTH_VERIFY_REDIRECT_URL if set.' })
   @ApiQuery({ name: 'token', required: true, description: 'Token from magic link' })
   @ApiResponse({ status: 200, description: 'Signed in; cookie set', type: AuthResponseDto })
+  @ApiResponse({ status: 302, description: 'Redirect to AUTH_VERIFY_REDIRECT_URL after setting cookie' })
   @ApiResponse({ status: 400, description: 'Invalid or expired link' })
   async verifyMagicLink(
     @Query('token') token: string,
@@ -104,6 +105,12 @@ export class AuthController {
   ): Promise<AuthResponseDto> {
     const result = await this.authService.verifyMagicLink(token);
     this.setAuthCookie(res, result.accessToken);
+
+    const redirectUrl = this.config.get(AUTH_CONFIG.VERIFY_REDIRECT_URL);
+    if (redirectUrl) {
+      res.redirect(302, redirectUrl);
+      return undefined as unknown as AuthResponseDto;
+    }
     return { user: result.user };
   }
 
