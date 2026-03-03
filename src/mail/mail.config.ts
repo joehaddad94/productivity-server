@@ -4,5 +4,5 @@ export const MAIL_CONFIG = {
   SMTP_USER: 'SMTP_USER',
   SMTP_PASS: 'SMTP_PASS',
   SMTP_FROM: 'SMTP_FROM',
-  SMTP_FROM_DEFAULT: 'Productivity <noreply@gmail.com>',
+  SMTP_FROM_DEFAULT: 'Tasky <noreply@gmail.com>',
 } as const;
