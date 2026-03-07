@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -37,6 +38,18 @@ export class WorkspacesService {
   async create(dto: CreateWorkspaceDto, userId: string): Promise<Workspace> {
     const slug =
       dto.slug?.trim() || this.slugify(dto.name) || 'workspace';
+
+    const memberships = await this.prisma.workspaceMember.findMany({
+      where: { userId },
+      include: { workspace: true },
+    });
+    const userSlugs = memberships.map((m) => m.workspace.slug);
+    if (userSlugs.includes(slug)) {
+      throw new ConflictException(
+        'You already have a workspace with this name or slug',
+      );
+    }
+
     const uniqueSlug = await this.ensureUniqueSlug(slug);
 
     const workspace = await this.prisma.workspace.create({
