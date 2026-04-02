@@ -7,7 +7,7 @@ import { DailyStat } from '@prisma/client';
 import { QueryAnalyticsDto } from './dto/query-analytics.dto';
 import { LogStatDto } from './dto/log-stat.dto';
 
-interface AnalyticsResult {
+export interface AnalyticsResult {
   dailyStats: DailyStat[];
   totals: {
     tasksCompleted: number;
