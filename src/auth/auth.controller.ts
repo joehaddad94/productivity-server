@@ -37,7 +37,7 @@ export class AuthController {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? 'strict' : 'lax',
-      maxAge: maxAgeSec * 1000, // milliseconds
+      maxAge: maxAgeSec * 1000,
       path: '/',
     });
   }
@@ -122,5 +122,30 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   me(@CurrentUser() user: RequestUser) {
     return { user };
+  }
+
+  /**
+   * DEV / TEST ONLY — not available in production.
+   * Creates (or reuses) a test user and returns a valid JWT cookie directly,
+   * bypassing the magic-link flow so Playwright can authenticate without email.
+   */
+  @Post('dev-session')
+  @ApiOperation({ summary: '[Dev/Test] Create a session directly (no magic link). Disabled in production.' })
+  @ApiResponse({ status: 201, description: 'Session created; cookie set' })
+  @ApiResponse({ status: 403, description: 'Not available in production' })
+  async devSession(
+    @Body() body: { email?: string; name?: string },
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ user: { id: string; email: string; name: string | null } }> {
+    if (this.config.get('NODE_ENV') === 'production') {
+      res.status(403).json({ message: 'Not available in production' });
+      return undefined as never;
+    }
+    const result = await this.authService.devSession(
+      body.email ?? 'playwright@tasky.test',
+      body.name ?? 'Playwright Test',
+    );
+    this.setAuthCookie(res, result.accessToken);
+    return { user: result.user };
   }
 }

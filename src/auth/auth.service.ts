@@ -64,6 +64,21 @@ export class AuthService {
     return { magicLink };
   }
 
+  /** Dev/test only: create or reuse a user and return a session directly. */
+  async devSession(email: string, name: string): Promise<AuthResult> {
+    let user = await this.usersService.findByEmail(email);
+    if (!user) {
+      user = await this.usersService.create({ email, name });
+    }
+    const session = await this.sessionService.createSession(user.id);
+    const accessToken = this.sessionService.signToken({
+      sub: user.id,
+      email: user.email,
+      jti: session.id,
+    });
+    return { user: { id: user.id, email: user.email, name: user.name }, accessToken };
+  }
+
   async verifyMagicLink(token: string): Promise<AuthResult> {
     const { email, name } = await this.magicLinkService.consumeToken(token);
 
