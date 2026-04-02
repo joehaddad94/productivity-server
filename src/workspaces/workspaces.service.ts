@@ -5,13 +5,25 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Workspace } from '@prisma/client';
+import { MailService } from '../mail/mail.service';
+import { ConfigService } from '@nestjs/config';
+import { Workspace, WorkspaceMember } from '@prisma/client';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
+import { InviteMemberDto } from './dto/invite-member.dto';
+import { UpdateMemberDto } from './dto/update-member.dto';
+
+type MemberWithUser = WorkspaceMember & {
+  user: { id: string; email: string; name: string | null; avatarUrl: string | null };
+};
 
 @Injectable()
 export class WorkspacesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mail: MailService,
+    private readonly config: ConfigService,
+  ) {}
 
   /** Generate URL-safe slug from name */
   private slugify(name: string): string {
@@ -122,5 +134,123 @@ export class WorkspacesService {
     }
 
     await this.prisma.workspace.delete({ where: { id } });
+  }
+
+  // --- Member management ---
+
+  async listMembers(workspaceId: string, requesterId: string): Promise<MemberWithUser[]> {
+    // Requester must be a member
+    const requesterMembership = await this.prisma.workspaceMember.findUnique({
+      where: { userId_workspaceId: { userId: requesterId, workspaceId } },
+    });
+    if (!requesterMembership) throw new ForbiddenException('Not a workspace member');
+
+    return this.prisma.workspaceMember.findMany({
+      where: { workspaceId },
+      include: {
+        user: { select: { id: true, email: true, name: true, avatarUrl: true } },
+      },
+    }) as Promise<MemberWithUser[]>;
+  }
+
+  async inviteMember(
+    workspaceId: string,
+    requesterId: string,
+    dto: InviteMemberDto,
+  ): Promise<{ invited: boolean; message: string }> {
+    const requesterMembership = await this.prisma.workspaceMember.findUnique({
+      where: { userId_workspaceId: { userId: requesterId, workspaceId } },
+    });
+    if (!requesterMembership) throw new ForbiddenException('Not a workspace member');
+
+    const workspace = await this.prisma.workspace.findUnique({ where: { id: workspaceId } });
+    if (!workspace) throw new NotFoundException('Workspace not found');
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (existingUser) {
+      // Check if already a member
+      const existing = await this.prisma.workspaceMember.findUnique({
+        where: {
+          userId_workspaceId: { userId: existingUser.id, workspaceId },
+        },
+      });
+      if (existing) {
+        return { invited: false, message: 'User is already a member of this workspace' };
+      }
+
+      await this.prisma.workspaceMember.create({
+        data: { userId: existingUser.id, workspaceId, role: 'member' },
+      });
+
+      // Send notification email
+      const appUrl = this.config.get<string>('NEXT_PUBLIC_APP_URL') ?? 'https://app.tasky.io';
+      await this.mail.sendInviteEmail(
+        dto.email,
+        workspace.name,
+        `${appUrl}/dashboard`,
+        existingUser.name ?? dto.email,
+      );
+
+      return { invited: true, message: 'User added to workspace' };
+    }
+
+    // User doesn't exist: send invite link
+    const appUrl = this.config.get<string>('NEXT_PUBLIC_APP_URL') ?? 'https://app.tasky.io';
+    const inviteLink = `${appUrl}/signup?email=${encodeURIComponent(dto.email)}&workspace=${workspaceId}`;
+
+    await this.mail.sendInviteEmail(dto.email, workspace.name, inviteLink, dto.email);
+
+    return { invited: true, message: 'Invite email sent' };
+  }
+
+  async removeMember(
+    workspaceId: string,
+    requesterId: string,
+    targetUserId: string,
+  ): Promise<void> {
+    const requesterMembership = await this.prisma.workspaceMember.findUnique({
+      where: { userId_workspaceId: { userId: requesterId, workspaceId } },
+    });
+    if (!requesterMembership) throw new ForbiddenException('Not a workspace member');
+    if (requesterMembership.role !== 'owner') {
+      throw new ForbiddenException('Only the workspace owner can remove members');
+    }
+
+    const targetMembership = await this.prisma.workspaceMember.findUnique({
+      where: { userId_workspaceId: { userId: targetUserId, workspaceId } },
+    });
+    if (!targetMembership) throw new NotFoundException('Member not found');
+
+    await this.prisma.workspaceMember.delete({
+      where: { userId_workspaceId: { userId: targetUserId, workspaceId } },
+    });
+  }
+
+  async updateMemberRole(
+    workspaceId: string,
+    requesterId: string,
+    targetUserId: string,
+    dto: UpdateMemberDto,
+  ): Promise<WorkspaceMember> {
+    const requesterMembership = await this.prisma.workspaceMember.findUnique({
+      where: { userId_workspaceId: { userId: requesterId, workspaceId } },
+    });
+    if (!requesterMembership) throw new ForbiddenException('Not a workspace member');
+    if (requesterMembership.role !== 'owner') {
+      throw new ForbiddenException('Only the workspace owner can update member roles');
+    }
+
+    const targetMembership = await this.prisma.workspaceMember.findUnique({
+      where: { userId_workspaceId: { userId: targetUserId, workspaceId } },
+    });
+    if (!targetMembership) throw new NotFoundException('Member not found');
+
+    return this.prisma.workspaceMember.update({
+      where: { userId_workspaceId: { userId: targetUserId, workspaceId } },
+      data: { role: dto.role },
+    });
   }
 }

@@ -52,6 +52,45 @@ export class MailService {
     }
   }
 
+  async sendInviteEmail(
+    to: string,
+    workspaceName: string,
+    inviteLink: string,
+    recipientName: string,
+  ): Promise<boolean> {
+    const transport = this.getTransporter();
+    if (!transport) return false;
+
+    const from =
+      this.config.get<string>(MAIL_CONFIG.SMTP_FROM) ?? MAIL_CONFIG.SMTP_FROM_DEFAULT;
+
+    try {
+      await transport.sendMail({
+        from,
+        to,
+        subject: `You've been invited to ${workspaceName} on Tasky`,
+        html: this.getInviteHtml(recipientName, workspaceName, inviteLink),
+      });
+      return true;
+    } catch (err) {
+      this.logger.warn(`SMTP send failed: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
+    }
+  }
+
+  private getInviteHtml(
+    recipientName: string,
+    workspaceName: string,
+    inviteLink: string,
+  ): string {
+    return `
+      <p>Hi ${recipientName},</p>
+      <p>You've been invited to join the workspace <strong>${workspaceName}</strong> on Tasky.</p>
+      <p><a href="${inviteLink}" style="display:inline-block;padding:10px 20px;background:#047857;color:#fff;text-decoration:none;border-radius:6px;">Accept Invitation</a></p>
+      <p>If you didn't expect this invitation, you can safely ignore this email.</p>
+    `.trim();
+  }
+
   private getMagicLinkHtml(magicLink: string): string {
     return `
       <p>Click the link below to sign in. It expires in 15 minutes.</p>

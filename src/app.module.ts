@@ -8,6 +8,10 @@ import { HealthModule } from './health/health.module';
 import { UsersModule } from './users/users.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { MailModule } from './mail/mail.module';
+import { NotesModule } from './notes/notes.module';
+import { TasksModule } from './tasks/tasks.module';
+import { ProjectsModule } from './projects/projects.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -21,6 +25,10 @@ import { MailModule } from './mail/mail.module';
     UsersModule,
     AuthModule,
     WorkspacesModule,
+    NotesModule,
+    TasksModule,
+    ProjectsModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

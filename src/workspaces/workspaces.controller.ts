@@ -15,6 +15,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { WorkspacesService } from './workspaces.service';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
+import { InviteMemberDto } from './dto/invite-member.dto';
+import { UpdateMemberDto } from './dto/update-member.dto';
 
 @ApiTags('workspaces')
 @Controller('workspaces')
@@ -80,6 +82,66 @@ export class WorkspacesController {
     @CurrentUser() user: RequestUser,
   ) {
     await this.workspacesService.remove(id, user.id);
+    return { success: true };
+  }
+
+  // --- Member management ---
+
+  @Get(':id/members')
+  @ApiOperation({ summary: 'List workspace members' })
+  @ApiResponse({ status: 200, description: 'Members list' })
+  @ApiResponse({ status: 403, description: 'Not a workspace member' })
+  async listMembers(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    const members = await this.workspacesService.listMembers(id, user.id);
+    return { members };
+  }
+
+  @Post(':id/members/invite')
+  @ApiOperation({ summary: 'Invite a user to the workspace' })
+  @ApiResponse({ status: 201, description: 'Invite sent or user added' })
+  @ApiResponse({ status: 403, description: 'Not a workspace member' })
+  async inviteMember(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: RequestUser,
+    @Body() dto: InviteMemberDto,
+  ) {
+    return this.workspacesService.inviteMember(id, user.id, dto);
+  }
+
+  @Patch(':id/members/:userId')
+  @ApiOperation({ summary: 'Update a member role (owner only)' })
+  @ApiResponse({ status: 200, description: 'Member role updated' })
+  @ApiResponse({ status: 403, description: 'Owner only' })
+  @ApiResponse({ status: 404, description: 'Member not found' })
+  async updateMemberRole(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('userId', ParseUUIDPipe) targetUserId: string,
+    @CurrentUser() user: RequestUser,
+    @Body() dto: UpdateMemberDto,
+  ) {
+    const member = await this.workspacesService.updateMemberRole(
+      id,
+      user.id,
+      targetUserId,
+      dto,
+    );
+    return { member };
+  }
+
+  @Delete(':id/members/:userId')
+  @ApiOperation({ summary: 'Remove a workspace member (owner only)' })
+  @ApiResponse({ status: 200, description: 'Member removed' })
+  @ApiResponse({ status: 403, description: 'Owner only' })
+  @ApiResponse({ status: 404, description: 'Member not found' })
+  async removeMember(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('userId', ParseUUIDPipe) targetUserId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    await this.workspacesService.removeMember(id, user.id, targetUserId);
     return { success: true };
   }
 }
