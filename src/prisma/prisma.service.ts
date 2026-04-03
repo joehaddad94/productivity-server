@@ -8,7 +8,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   private readonly logger = new Logger(PrismaService.name);
 
   constructor(config: ConfigService) {
-    const connectionString = config.getOrThrow<string>('DATABASE_URL');
+    // Prefer DIRECT_URL (session-mode / direct connection) for the runtime adapter.
+    // DATABASE_URL may point to the PgBouncer transaction-mode pooler (?pgbouncer=true)
+    // which is incompatible with @prisma/adapter-pg's own connection pooling.
+    const connectionString =
+      config.get<string>('DIRECT_URL') ??
+      config.getOrThrow<string>('DATABASE_URL');
     const adapter = new PrismaPg({
       connectionString,
       ssl: { rejectUnauthorized: false },
