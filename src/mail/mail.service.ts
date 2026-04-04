@@ -16,15 +16,21 @@ export class MailService {
 
     const user = this.config.get<string>(MAIL_CONFIG.SMTP_USER);
     const pass = this.config.get<string>(MAIL_CONFIG.SMTP_PASS);
-    if (!user || !pass) return null;
+    if (!user || !pass) {
+      this.logger.warn('SMTP not configured: SMTP_USER or SMTP_PASS is missing');
+      return null;
+    }
 
     const host = this.config.get<string>(MAIL_CONFIG.SMTP_HOST) ?? 'smtp.gmail.com';
-    const port = this.config.get<number>(MAIL_CONFIG.SMTP_PORT) ?? 587;
+    const port = Number(this.config.get<number>(MAIL_CONFIG.SMTP_PORT) ?? 587);
+    const secure = port === 465;
+
+    this.logger.log(`SMTP config: host=${host} port=${port} secure=${secure} user=${user}`);
 
     this.transporter = nodemailer.createTransport({
       host,
-      port: Number(port),
-      secure: port === 465,
+      port,
+      secure,
       auth: { user, pass },
     });
 
@@ -47,7 +53,7 @@ export class MailService {
       });
       return true;
     } catch (err) {
-      this.logger.warn(`SMTP send failed: ${err instanceof Error ? err.message : String(err)}`);
+      this.logger.error(`SMTP send failed to ${to}: ${err instanceof Error ? err.message : String(err)}`, err instanceof Error ? err.stack : undefined);
       return false;
     }
   }
@@ -73,7 +79,7 @@ export class MailService {
       });
       return true;
     } catch (err) {
-      this.logger.warn(`SMTP send failed: ${err instanceof Error ? err.message : String(err)}`);
+      this.logger.error(`SMTP send failed to ${to}: ${err instanceof Error ? err.message : String(err)}`, err instanceof Error ? err.stack : undefined);
       return false;
     }
   }

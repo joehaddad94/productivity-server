@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { LoginDto } from './dto/login.dto';
@@ -21,33 +22,35 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto): Promise<MagicLinkMessageResult> {
-    const existing = await this.usersService.findByEmail(dto.email);
+    const normalized = dto.email.toLowerCase().trim();
+    const existing = await this.usersService.findByEmail(normalized);
     if (existing) {
       throw new ConflictException('A user with this email already exists');
     }
 
-    const { magicLink } = await this.magicLinkService.createMagicLink(dto.email, dto.name);
-    const sent = await this.mailService.sendMagicLinkEmail(dto.email.toLowerCase().trim(), magicLink);
-
-    if (sent) {
-      return { message: 'Check your email to complete signup. Click the link to access your account.' };
+    const { magicLink } = await this.magicLinkService.createMagicLink(normalized, dto.name);
+    const sent = await this.mailService.sendMagicLinkEmail(normalized, magicLink);
+    if (!sent) {
+      throw new ServiceUnavailableException('Failed to send verification email. Please try again.');
     }
-    return { message: 'Check your email to complete signup. Use the link below in dev.', magicLink };
+
+    return { message: 'Check your email to complete signup. Click the link to access your account.' };
   }
 
   async login(dto: LoginDto): Promise<MagicLinkMessageResult> {
-    const user = await this.usersService.findByEmail(dto.email);
+    const normalized = dto.email.toLowerCase().trim();
+    const user = await this.usersService.findByEmail(normalized);
     if (!user) {
       throw new UnauthorizedException('No account found for this email');
     }
 
-    const { magicLink } = await this.magicLinkService.createMagicLink(dto.email);
-    const sent = await this.mailService.sendMagicLinkEmail(dto.email.toLowerCase().trim(), magicLink);
-
-    if (sent) {
-      return { message: 'Check your email to sign in. Click the link to access your account.' };
+    const { magicLink } = await this.magicLinkService.createMagicLink(normalized);
+    const sent = await this.mailService.sendMagicLinkEmail(normalized, magicLink);
+    if (!sent) {
+      throw new ServiceUnavailableException('Failed to send sign-in email. Please try again.');
     }
-    return { message: 'Check your email to sign in. Use the link below in dev.', magicLink };
+
+    return { message: 'Check your email to sign in. Click the link to access your account.' };
   }
 
   async logout(sessionId: string): Promise<void> {
