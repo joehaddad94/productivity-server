@@ -1,5 +1,5 @@
 import './instrumentation';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
@@ -8,6 +8,22 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const httpLogger = new Logger('HTTP');
+
+  app.use((req: any, res: any, next: () => void) => {
+    const { method, url } = req;
+    const start = Date.now();
+    res.on('finish', () => {
+      const ms = Date.now() - start;
+      const { statusCode } = res;
+      const log = `${method} ${url} ${statusCode} +${ms}ms`;
+      if (statusCode >= 500) httpLogger.error(log);
+      else if (statusCode >= 400) httpLogger.warn(log);
+      else httpLogger.log(log);
+    });
+    next();
+  });
+
   app.use(cookieParser());
 
   app.enableCors({
