@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Post,
   Query,
   Res,
@@ -16,6 +17,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SendMagicLinkDto } from './dto/send-magic-link.dto';
 import { AuthService } from './auth.service';
+import { UsersService } from '../users/users.service';
 import { CurrentUser, RequestUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -26,6 +28,7 @@ const COOKIE_NAME = AUTH_CONFIG.COOKIE_NAME;
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly usersService: UsersService,
     private readonly config: ConfigService,
   ) {}
 
@@ -122,6 +125,20 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   me(@CurrentUser() user: RequestUser) {
     return { user };
+  }
+
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update current user profile (name)' })
+  @ApiResponse({ status: 200, description: 'Updated user' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async updateMe(
+    @CurrentUser() user: RequestUser,
+    @Body() body: { name?: string },
+  ) {
+    const updated = await this.usersService.updateProfile(user.id, { name: body.name });
+    return { user: { id: updated.id, email: updated.email, name: updated.name } };
   }
 
   /**

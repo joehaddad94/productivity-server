@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 import { Task } from '@prisma/client';
 import { CreateTaskDto, TaskStatus } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -13,7 +14,10 @@ type TaskWithSubtasks = Task & { subtasks: Task[] };
 
 @Injectable()
 export class TasksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly analytics: AnalyticsService,
+  ) {}
 
   private async assertMember(workspaceId: string, userId: string): Promise<void> {
     const membership = await this.prisma.workspaceMember.findUnique({
@@ -115,11 +119,13 @@ export class TasksService {
     userId: string,
     dto: UpdateTaskDto,
   ): Promise<Task> {
-    await this.findOne(workspaceId, id, userId);
+    const existing = await this.findOne(workspaceId, id, userId);
 
-    const isCompleting = dto.status === TaskStatus.COMPLETED;
+    const isCompleting =
+      dto.status === TaskStatus.COMPLETED &&
+      existing.status !== TaskStatus.COMPLETED;
 
-    return this.prisma.task.update({
+    const updated = await this.prisma.task.update({
       where: { id },
       data: {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
@@ -133,6 +139,12 @@ export class TasksService {
         ...(isCompleting ? { completedAt: new Date() } : {}),
       },
     });
+
+    if (isCompleting) {
+      await this.analytics.logStat(workspaceId, userId, { tasksCompleted: 1 });
+    }
+
+    return updated;
   }
 
   async remove(workspaceId: string, id: string, userId: string): Promise<void> {
