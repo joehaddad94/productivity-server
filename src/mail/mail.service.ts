@@ -1,94 +1,66 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
-import type { Transporter } from 'nodemailer';
-import { MAIL_CONFIG } from './mail.config';
+import { BrevoClient } from '@getbrevo/brevo';
 
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private transporter: Transporter | null = null;
 
   constructor(private readonly config: ConfigService) {}
 
-  private getTransporter(): Transporter | null {
-    if (this.transporter) return this.transporter;
-
-    const user = this.config.get<string>(MAIL_CONFIG.SMTP_USER);
-    const pass = this.config.get<string>(MAIL_CONFIG.SMTP_PASS);
-    if (!user || !pass) {
-      this.logger.warn('SMTP not configured: SMTP_USER or SMTP_PASS is missing');
+  private getClient(): { emails: BrevoClient['transactionalEmails']; from: { name: string; email: string } } | null {
+    const apiKey = this.config.get<string>('BREVO_API_KEY');
+    if (!apiKey) {
+      this.logger.warn('BREVO_API_KEY is not set — email sending is disabled');
       return null;
     }
 
-    const host = this.config.get<string>(MAIL_CONFIG.SMTP_HOST) ?? 'smtp.gmail.com';
-    const port = Number(this.config.get<number>(MAIL_CONFIG.SMTP_PORT) ?? 587);
-    const secure = port === 465;
+    const client = new BrevoClient({ apiKey });
+    const fromName = this.config.get<string>('SMTP_FROM_NAME') ?? 'Tasky';
+    const fromEmail = this.config.get<string>('SMTP_FROM_EMAIL') ?? 'noreply@tasky.app';
 
-    this.logger.log(`SMTP config: host=${host} port=${port} secure=${secure} user=${user}`);
-
-    this.transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure,
-      auth: { user, pass },
-    });
-
-    return this.transporter;
+    return { emails: client.transactionalEmails, from: { name: fromName, email: fromEmail } };
   }
 
   async sendMagicLinkEmail(to: string, magicLink: string): Promise<boolean> {
-    const transport = this.getTransporter();
-    if (!transport) return false;
-
-    const from =
-      this.config.get<string>(MAIL_CONFIG.SMTP_FROM) ?? MAIL_CONFIG.SMTP_FROM_DEFAULT;
+    const ctx = this.getClient();
+    if (!ctx) return false;
 
     try {
-      await transport.sendMail({
-        from,
-        to,
+      await ctx.emails.sendTransacEmail({
+        sender: ctx.from,
+        to: [{ email: to }],
         subject: 'Your magic link to sign in',
-        html: this.getMagicLinkHtml(magicLink),
+        htmlContent: this.getMagicLinkHtml(magicLink),
       });
+      this.logger.log(`Magic link email sent to ${to}`);
       return true;
     } catch (err) {
-      this.logger.error(`SMTP send failed to ${to}: ${err instanceof Error ? err.message : String(err)}`, err instanceof Error ? err.stack : undefined);
+      this.logger.error(`Failed to send magic link to ${to}: ${err instanceof Error ? err.message : String(err)}`, err instanceof Error ? err.stack : undefined);
       return false;
     }
   }
 
-  async sendInviteEmail(
-    to: string,
-    workspaceName: string,
-    inviteLink: string,
-    recipientName: string,
-  ): Promise<boolean> {
-    const transport = this.getTransporter();
-    if (!transport) return false;
-
-    const from =
-      this.config.get<string>(MAIL_CONFIG.SMTP_FROM) ?? MAIL_CONFIG.SMTP_FROM_DEFAULT;
+  async sendInviteEmail(to: string, workspaceName: string, inviteLink: string, recipientName: string): Promise<boolean> {
+    const ctx = this.getClient();
+    if (!ctx) return false;
 
     try {
-      await transport.sendMail({
-        from,
-        to,
+      await ctx.emails.sendTransacEmail({
+        sender: ctx.from,
+        to: [{ email: to }],
         subject: `You've been invited to ${workspaceName} on Tasky`,
-        html: this.getInviteHtml(recipientName, workspaceName, inviteLink),
+        htmlContent: this.getInviteHtml(recipientName, workspaceName, inviteLink),
       });
+      this.logger.log(`Invite email sent to ${to}`);
       return true;
     } catch (err) {
-      this.logger.error(`SMTP send failed to ${to}: ${err instanceof Error ? err.message : String(err)}`, err instanceof Error ? err.stack : undefined);
+      this.logger.error(`Failed to send invite to ${to}: ${err instanceof Error ? err.message : String(err)}`, err instanceof Error ? err.stack : undefined);
       return false;
     }
   }
 
-  private getInviteHtml(
-    recipientName: string,
-    workspaceName: string,
-    inviteLink: string,
-  ): string {
+  private getInviteHtml(recipientName: string, workspaceName: string, inviteLink: string): string {
     return `
       <p>Hi ${recipientName},</p>
       <p>You've been invited to join the workspace <strong>${workspaceName}</strong> on Tasky.</p>
