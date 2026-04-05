@@ -32,43 +32,53 @@ export class TasksService {
     workspaceId: string,
     userId: string,
     query: QueryTaskDto,
-  ): Promise<TaskWithSubtasks[]> {
+  ): Promise<{ tasks: TaskWithSubtasks[]; total: number }> {
     await this.assertMember(workspaceId, userId);
 
-    const tasks = await this.prisma.task.findMany({
-      where: {
-        workspaceId,
-        deletedAt: null,
-        parentTaskId: null,
-        ...(query.status ? { status: query.status } : {}),
-        ...(query.priority ? { priority: query.priority } : {}),
-        ...(query.search
-          ? {
-              OR: [
-                { title: { contains: query.search, mode: 'insensitive' } },
-                { description: { contains: query.search, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-        ...(query.dueBefore || query.dueAfter
-          ? {
-              dueDate: {
-                ...(query.dueBefore ? { lte: new Date(query.dueBefore) } : {}),
-                ...(query.dueAfter ? { gte: new Date(query.dueAfter) } : {}),
-              },
-            }
-          : {}),
-      },
-      include: {
-        subtasks: {
-          where: { deletedAt: null },
-          orderBy: { createdAt: 'asc' },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const where = {
+      workspaceId,
+      deletedAt: null,
+      parentTaskId: null,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.priority ? { priority: query.priority } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { title: { contains: query.search, mode: 'insensitive' as const } },
+              { description: { contains: query.search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+      ...(query.dueBefore || query.dueAfter
+        ? {
+            dueDate: {
+              ...(query.dueBefore ? { lte: new Date(query.dueBefore) } : {}),
+              ...(query.dueAfter ? { gte: new Date(query.dueAfter) } : {}),
+            },
+          }
+        : {}),
+    };
 
-    return tasks as TaskWithSubtasks[];
+    const limit = query.limit ?? 50;
+    const skip = query.skip ?? 0;
+
+    const [tasks, total] = await this.prisma.$transaction([
+      this.prisma.task.findMany({
+        where,
+        include: {
+          subtasks: {
+            where: { deletedAt: null },
+            orderBy: { createdAt: 'asc' },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip,
+      }),
+      this.prisma.task.count({ where }),
+    ]);
+
+    return { tasks: tasks as TaskWithSubtasks[], total };
   }
 
   async create(

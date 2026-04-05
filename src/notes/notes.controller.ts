@@ -34,8 +34,7 @@ export class NotesController {
     @CurrentUser() user: RequestUser,
     @Query() query: QueryNoteDto,
   ) {
-    const notes = await this.notesService.list(workspaceId, user.id, query);
-    return { notes };
+    return this.notesService.list(workspaceId, user.id, query);
   }
 
   @Post()

@@ -34,8 +34,7 @@ export class TasksController {
     @CurrentUser() user: RequestUser,
     @Query() query: QueryTaskDto,
   ) {
-    const tasks = await this.tasksService.list(workspaceId, user.id, query);
-    return { tasks };
+    return this.tasksService.list(workspaceId, user.id, query);
   }
 
   @Post()

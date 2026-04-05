@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Project } from '@prisma/client';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { QueryProjectDto } from './dto/query-project.dto';
 
 type ProjectWithNoteCount = Project & { _count: { notes: number } };
 
@@ -23,14 +24,29 @@ export class ProjectsService {
     }
   }
 
-  async list(workspaceId: string, userId: string): Promise<ProjectWithNoteCount[]> {
+  async list(
+    workspaceId: string,
+    userId: string,
+    query: QueryProjectDto = {},
+  ): Promise<{ projects: ProjectWithNoteCount[]; total: number }> {
     await this.assertMember(workspaceId, userId);
 
-    return this.prisma.project.findMany({
-      where: { workspaceId },
-      include: { _count: { select: { notes: true } } },
-      orderBy: { createdAt: 'desc' },
-    }) as Promise<ProjectWithNoteCount[]>;
+    const limit = query.limit ?? 50;
+    const skip = query.skip ?? 0;
+    const where = { workspaceId };
+
+    const [projects, total] = await this.prisma.$transaction([
+      this.prisma.project.findMany({
+        where,
+        include: { _count: { select: { notes: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip,
+      }),
+      this.prisma.project.count({ where }),
+    ]);
+
+    return { projects: projects as ProjectWithNoteCount[], total };
   }
 
   async create(workspaceId: string, userId: string, dto: CreateProjectDto): Promise<Project> {

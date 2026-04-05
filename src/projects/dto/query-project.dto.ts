@@ -1,23 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class QueryNoteDto {
-  @ApiPropertyOptional({ description: 'Search in title and content' })
-  @IsOptional()
-  @IsString()
-  search?: string;
-
-  @ApiPropertyOptional({ description: 'Comma-separated tags to filter by' })
-  @IsOptional()
-  @IsString()
-  tags?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsUUID()
-  projectId?: string;
-
+export class QueryProjectDto {
   @ApiPropertyOptional({ description: 'Max number of records to return (default 50)', default: 50 })
   @IsOptional()
   @IsInt()
