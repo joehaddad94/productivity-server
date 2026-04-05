@@ -103,6 +103,7 @@ model Task {
   status         String    @default("pending")
   completedAt    DateTime? @map("completed_at")
   parentTaskId   String?   @map("parent_task_id")
+  sortOrder      Int       @default(0) @map("sort_order")
   createdAt      DateTime  @default(now()) @map("created_at")
   deletedAt      DateTime? @map("deleted_at")
 

@@ -102,4 +102,17 @@ export class TasksController {
   ) {
     return this.tasksService.bulkUpdate(workspaceId, user.id, dto);
   }
+
+  @Post('reorder')
+  @ApiOperation({ summary: 'Reorder tasks — supply ordered array of task IDs' })
+  @ApiResponse({ status: 200, description: 'Tasks reordered' })
+  @ApiResponse({ status: 403, description: 'Not a workspace member' })
+  async reorder(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @CurrentUser() user: RequestUser,
+    @Body() body: { ids: string[] },
+  ) {
+    await this.tasksService.reorder(workspaceId, user.id, body.ids);
+    return { success: true };
+  }
 }

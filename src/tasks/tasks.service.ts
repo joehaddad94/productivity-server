@@ -72,7 +72,7 @@ export class TasksService {
             orderBy: { createdAt: 'asc' },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
         take: limit,
         skip,
       }),
@@ -147,6 +147,7 @@ export class TasksService {
         ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.parentTaskId !== undefined ? { parentTaskId: dto.parentTaskId } : {}),
+        ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
         ...(isCompleting ? { completedAt: new Date() } : {}),
       },
     });
@@ -164,6 +165,23 @@ export class TasksService {
       where: { id },
       data: { deletedAt: new Date() },
     });
+  }
+
+  /** Reorder tasks: accepts ordered array of ids, assigns sortOrder 0..n-1 */
+  async reorder(
+    workspaceId: string,
+    userId: string,
+    ids: string[],
+  ): Promise<void> {
+    await this.assertMember(workspaceId, userId);
+    await this.prisma.$transaction(
+      ids.map((id, index) =>
+        this.prisma.task.update({
+          where: { id, workspaceId },
+          data: { sortOrder: index },
+        }),
+      ),
+    );
   }
 
   async bulkUpdate(
