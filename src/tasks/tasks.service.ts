@@ -9,6 +9,7 @@ import { Task } from '@prisma/client';
 import { CreateTaskDto, TaskStatus } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { QueryTaskDto } from './dto/query-task.dto';
+import { BulkTaskDto, BulkTaskAction } from './dto/bulk-task.dto';
 
 type TaskWithSubtasks = Task & { subtasks: Task[] };
 
@@ -163,5 +164,51 @@ export class TasksService {
       where: { id },
       data: { deletedAt: new Date() },
     });
+  }
+
+  async bulkUpdate(
+    workspaceId: string,
+    userId: string,
+    dto: BulkTaskDto,
+  ): Promise<{ affected: number }> {
+    await this.assertMember(workspaceId, userId);
+
+    // Validate all requested IDs belong to this workspace and are not deleted
+    const tasks = await this.prisma.task.findMany({
+      where: { id: { in: dto.ids }, workspaceId, deletedAt: null },
+      select: { id: true, status: true },
+    });
+
+    if (tasks.length === 0) {
+      return { affected: 0 };
+    }
+
+    const validIds = tasks.map((t) => t.id);
+
+    if (dto.action === BulkTaskAction.DELETE) {
+      await this.prisma.task.updateMany({
+        where: { id: { in: validIds } },
+        data: { deletedAt: new Date() },
+      });
+      return { affected: validIds.length };
+    }
+
+    // action === complete
+    const alreadyDoneIds = new Set(
+      tasks.filter((t) => t.status === TaskStatus.COMPLETED).map((t) => t.id),
+    );
+    const toCompleteIds = validIds.filter((id) => !alreadyDoneIds.has(id));
+
+    if (toCompleteIds.length > 0) {
+      await this.prisma.task.updateMany({
+        where: { id: { in: toCompleteIds } },
+        data: { status: TaskStatus.COMPLETED, completedAt: new Date() },
+      });
+      await this.analytics.logStat(workspaceId, userId, {
+        tasksCompleted: toCompleteIds.length,
+      });
+    }
+
+    return { affected: toCompleteIds.length };
   }
 }
