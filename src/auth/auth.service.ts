@@ -1,5 +1,7 @@
 import {
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -12,8 +14,33 @@ import { SessionService } from './services/session.service';
 import { MagicLinkService } from './services/magic-link.service';
 import type { AuthResult, MagicLinkMessageResult } from './types/auth.types';
 
+/** Simple in-memory rate limiter: max 3 magic link requests per email per 10 minutes. */
+class MagicLinkRateLimiter {
+  private readonly window = 10 * 60 * 1000; // 10 minutes
+  private readonly max = 3;
+  private readonly counts = new Map<string, { count: number; resetAt: number }>();
+
+  check(email: string): void {
+    const now = Date.now();
+    const entry = this.counts.get(email);
+    if (!entry || now >= entry.resetAt) {
+      this.counts.set(email, { count: 1, resetAt: now + this.window });
+      return;
+    }
+    if (entry.count >= this.max) {
+      throw new HttpException(
+        'Too many magic link requests. Please wait 10 minutes before trying again.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    entry.count++;
+  }
+}
+
 @Injectable()
 export class AuthService {
+  private readonly rateLimiter = new MagicLinkRateLimiter();
+
   constructor(
     private readonly usersService: UsersService,
     private readonly mailService: MailService,
@@ -23,6 +50,7 @@ export class AuthService {
 
   async register(dto: RegisterDto): Promise<MagicLinkMessageResult> {
     const normalized = dto.email.toLowerCase().trim();
+    this.rateLimiter.check(normalized);
     const existing = await this.usersService.findByEmail(normalized);
     if (existing) {
       throw new ConflictException('A user with this email already exists');
@@ -39,6 +67,7 @@ export class AuthService {
 
   async login(dto: LoginDto): Promise<MagicLinkMessageResult> {
     const normalized = dto.email.toLowerCase().trim();
+    this.rateLimiter.check(normalized);
     const user = await this.usersService.findByEmail(normalized);
     if (!user) {
       throw new UnauthorizedException('No account found for this email');
@@ -59,27 +88,13 @@ export class AuthService {
 
   async sendMagicLink(email: string): Promise<{ magicLink?: string; message?: string }> {
     const normalized = email.toLowerCase().trim();
+    this.rateLimiter.check(normalized);
     const { magicLink } = await this.magicLinkService.createMagicLink(normalized);
     const sent = await this.mailService.sendMagicLinkEmail(normalized, magicLink);
     if (sent) {
       return { message: 'If that email is registered, you will receive a magic link shortly.' };
     }
     return { magicLink };
-  }
-
-  /** Dev/test only: create or reuse a user and return a session directly. */
-  async devSession(email: string, name: string): Promise<AuthResult> {
-    let user = await this.usersService.findByEmail(email);
-    if (!user) {
-      user = await this.usersService.create({ email, name });
-    }
-    const session = await this.sessionService.createSession(user.id);
-    const accessToken = this.sessionService.signToken({
-      sub: user.id,
-      email: user.email,
-      jti: session.id,
-    });
-    return { user: { id: user.id, email: user.email, name: user.name }, accessToken };
   }
 
   async verifyMagicLink(token: string): Promise<AuthResult> {

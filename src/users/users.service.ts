@@ -27,6 +27,13 @@ export class UsersService {
     });
   }
 
+  async updateProfile(id: string, data: { name?: string }): Promise<User> {
+    return this.prisma.user.update({
+      where: { id },
+      data: { ...(data.name !== undefined ? { name: data.name.trim() || null } : {}) },
+    });
+  }
+
   private normalizeEmail(email: string): string {
     return email.toLowerCase().trim();
   }

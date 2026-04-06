@@ -22,29 +22,40 @@ export class NotesService {
     }
   }
 
-  async list(workspaceId: string, userId: string, query: QueryNoteDto): Promise<Note[]> {
+  async list(
+    workspaceId: string,
+    userId: string,
+    query: QueryNoteDto,
+  ): Promise<{ notes: Note[]; total: number }> {
     await this.assertMember(workspaceId, userId);
 
     const tagList = query.tags
       ? query.tags.split(',').map((t) => t.trim()).filter(Boolean)
       : undefined;
 
-    return this.prisma.note.findMany({
-      where: {
-        workspaceId,
-        ...(query.search
-          ? {
-              OR: [
-                { title: { contains: query.search, mode: 'insensitive' } },
-                { content: { contains: query.search, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-        ...(tagList?.length ? { tags: { hasSome: tagList } } : {}),
-        ...(query.projectId ? { projectId: query.projectId } : {}),
-      },
-      orderBy: { updatedAt: 'desc' },
-    });
+    const where = {
+      workspaceId,
+      ...(query.search
+        ? {
+            OR: [
+              { title: { contains: query.search, mode: 'insensitive' as const } },
+              { content: { contains: query.search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+      ...(tagList?.length ? { tags: { hasSome: tagList } } : {}),
+      ...(query.projectId ? { projectId: query.projectId } : {}),
+    };
+
+    const limit = query.limit ?? 50;
+    const skip = query.skip ?? 0;
+
+    const [notes, total] = await this.prisma.$transaction([
+      this.prisma.note.findMany({ where, orderBy: { updatedAt: 'desc' }, take: limit, skip }),
+      this.prisma.note.count({ where }),
+    ]);
+
+    return { notes, total };
   }
 
   async create(workspaceId: string, userId: string, dto: CreateNoteDto): Promise<Note> {

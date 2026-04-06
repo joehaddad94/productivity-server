@@ -17,6 +17,7 @@ import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { QueryTaskDto } from './dto/query-task.dto';
+import { BulkTaskDto } from './dto/bulk-task.dto';
 
 @ApiTags('tasks')
 @Controller('workspaces/:workspaceId/tasks')
@@ -34,8 +35,7 @@ export class TasksController {
     @CurrentUser() user: RequestUser,
     @Query() query: QueryTaskDto,
   ) {
-    const tasks = await this.tasksService.list(workspaceId, user.id, query);
-    return { tasks };
+    return this.tasksService.list(workspaceId, user.id, query);
   }
 
   @Post()
@@ -89,5 +89,17 @@ export class TasksController {
   ) {
     await this.tasksService.remove(workspaceId, id, user.id);
     return { success: true };
+  }
+
+  @Post('bulk')
+  @ApiOperation({ summary: 'Bulk complete or delete tasks (max 100)' })
+  @ApiResponse({ status: 200, description: '{ affected: number }' })
+  @ApiResponse({ status: 403, description: 'Not a workspace member' })
+  async bulk(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @CurrentUser() user: RequestUser,
+    @Body() dto: BulkTaskDto,
+  ) {
+    return this.tasksService.bulkUpdate(workspaceId, user.id, dto);
   }
 }

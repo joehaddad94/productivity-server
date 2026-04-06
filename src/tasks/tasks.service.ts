@@ -4,16 +4,21 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 import { Task } from '@prisma/client';
 import { CreateTaskDto, TaskStatus } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { QueryTaskDto } from './dto/query-task.dto';
+import { BulkTaskDto, BulkTaskAction } from './dto/bulk-task.dto';
 
 type TaskWithSubtasks = Task & { subtasks: Task[] };
 
 @Injectable()
 export class TasksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly analytics: AnalyticsService,
+  ) {}
 
   private async assertMember(workspaceId: string, userId: string): Promise<void> {
     const membership = await this.prisma.workspaceMember.findUnique({
@@ -28,43 +33,53 @@ export class TasksService {
     workspaceId: string,
     userId: string,
     query: QueryTaskDto,
-  ): Promise<TaskWithSubtasks[]> {
+  ): Promise<{ tasks: TaskWithSubtasks[]; total: number }> {
     await this.assertMember(workspaceId, userId);
 
-    const tasks = await this.prisma.task.findMany({
-      where: {
-        workspaceId,
-        deletedAt: null,
-        parentTaskId: null,
-        ...(query.status ? { status: query.status } : {}),
-        ...(query.priority ? { priority: query.priority } : {}),
-        ...(query.search
-          ? {
-              OR: [
-                { title: { contains: query.search, mode: 'insensitive' } },
-                { description: { contains: query.search, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-        ...(query.dueBefore || query.dueAfter
-          ? {
-              dueDate: {
-                ...(query.dueBefore ? { lte: new Date(query.dueBefore) } : {}),
-                ...(query.dueAfter ? { gte: new Date(query.dueAfter) } : {}),
-              },
-            }
-          : {}),
-      },
-      include: {
-        subtasks: {
-          where: { deletedAt: null },
-          orderBy: { createdAt: 'asc' },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const where = {
+      workspaceId,
+      deletedAt: null,
+      parentTaskId: null,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.priority ? { priority: query.priority } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { title: { contains: query.search, mode: 'insensitive' as const } },
+              { description: { contains: query.search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+      ...(query.dueBefore || query.dueAfter
+        ? {
+            dueDate: {
+              ...(query.dueBefore ? { lte: new Date(query.dueBefore) } : {}),
+              ...(query.dueAfter ? { gte: new Date(query.dueAfter) } : {}),
+            },
+          }
+        : {}),
+    };
 
-    return tasks as TaskWithSubtasks[];
+    const limit = query.limit ?? 50;
+    const skip = query.skip ?? 0;
+
+    const [tasks, total] = await this.prisma.$transaction([
+      this.prisma.task.findMany({
+        where,
+        include: {
+          subtasks: {
+            where: { deletedAt: null },
+            orderBy: { createdAt: 'asc' },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip,
+      }),
+      this.prisma.task.count({ where }),
+    ]);
+
+    return { tasks: tasks as TaskWithSubtasks[], total };
   }
 
   async create(
@@ -115,11 +130,13 @@ export class TasksService {
     userId: string,
     dto: UpdateTaskDto,
   ): Promise<Task> {
-    await this.findOne(workspaceId, id, userId);
+    const existing = await this.findOne(workspaceId, id, userId);
 
-    const isCompleting = dto.status === TaskStatus.COMPLETED;
+    const isCompleting =
+      dto.status === TaskStatus.COMPLETED &&
+      existing.status !== TaskStatus.COMPLETED;
 
-    return this.prisma.task.update({
+    const updated = await this.prisma.task.update({
       where: { id },
       data: {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
@@ -133,6 +150,12 @@ export class TasksService {
         ...(isCompleting ? { completedAt: new Date() } : {}),
       },
     });
+
+    if (isCompleting) {
+      await this.analytics.logStat(workspaceId, userId, { tasksCompleted: 1 });
+    }
+
+    return updated;
   }
 
   async remove(workspaceId: string, id: string, userId: string): Promise<void> {
@@ -141,5 +164,51 @@ export class TasksService {
       where: { id },
       data: { deletedAt: new Date() },
     });
+  }
+
+  async bulkUpdate(
+    workspaceId: string,
+    userId: string,
+    dto: BulkTaskDto,
+  ): Promise<{ affected: number }> {
+    await this.assertMember(workspaceId, userId);
+
+    // Validate all requested IDs belong to this workspace and are not deleted
+    const tasks = await this.prisma.task.findMany({
+      where: { id: { in: dto.ids }, workspaceId, deletedAt: null },
+      select: { id: true, status: true },
+    });
+
+    if (tasks.length === 0) {
+      return { affected: 0 };
+    }
+
+    const validIds = tasks.map((t) => t.id);
+
+    if (dto.action === BulkTaskAction.DELETE) {
+      await this.prisma.task.updateMany({
+        where: { id: { in: validIds } },
+        data: { deletedAt: new Date() },
+      });
+      return { affected: validIds.length };
+    }
+
+    // action === complete
+    const alreadyDoneIds = new Set(
+      tasks.filter((t) => t.status === TaskStatus.COMPLETED).map((t) => t.id),
+    );
+    const toCompleteIds = validIds.filter((id) => !alreadyDoneIds.has(id));
+
+    if (toCompleteIds.length > 0) {
+      await this.prisma.task.updateMany({
+        where: { id: { in: toCompleteIds } },
+        data: { status: TaskStatus.COMPLETED, completedAt: new Date() },
+      });
+      await this.analytics.logStat(workspaceId, userId, {
+        tasksCompleted: toCompleteIds.length,
+      });
+    }
+
+    return { affected: toCompleteIds.length };
   }
 }

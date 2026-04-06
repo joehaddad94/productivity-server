@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -15,6 +16,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { QueryProjectDto } from './dto/query-project.dto';
 
 @ApiTags('projects')
 @Controller('workspaces/:workspaceId/projects')
@@ -30,9 +32,9 @@ export class ProjectsController {
   async list(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @CurrentUser() user: RequestUser,
+    @Query() query: QueryProjectDto,
   ) {
-    const projects = await this.projectsService.list(workspaceId, user.id);
-    return { projects };
+    return this.projectsService.list(workspaceId, user.id, query);
   }
 
   @Post()

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Post,
   Query,
   Res,
@@ -16,6 +17,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SendMagicLinkDto } from './dto/send-magic-link.dto';
 import { AuthService } from './auth.service';
+import { UsersService } from '../users/users.service';
 import { CurrentUser, RequestUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -26,6 +28,7 @@ const COOKIE_NAME = AUTH_CONFIG.COOKIE_NAME;
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly usersService: UsersService,
     private readonly config: ConfigService,
   ) {}
 
@@ -124,28 +127,18 @@ export class AuthController {
     return { user };
   }
 
-  /**
-   * DEV / TEST ONLY — not available in production.
-   * Creates (or reuses) a test user and returns a valid JWT cookie directly,
-   * bypassing the magic-link flow so Playwright can authenticate without email.
-   */
-  @Post('dev-session')
-  @ApiOperation({ summary: '[Dev/Test] Create a session directly (no magic link). Disabled in production.' })
-  @ApiResponse({ status: 201, description: 'Session created; cookie set' })
-  @ApiResponse({ status: 403, description: 'Not available in production' })
-  async devSession(
-    @Body() body: { email?: string; name?: string },
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<{ user: { id: string; email: string; name: string | null } }> {
-    if (this.config.get('NODE_ENV') === 'production') {
-      res.status(403).json({ message: 'Not available in production' });
-      return undefined as never;
-    }
-    const result = await this.authService.devSession(
-      body.email ?? 'playwright@tasky.test',
-      body.name ?? 'Playwright Test',
-    );
-    this.setAuthCookie(res, result.accessToken);
-    return { user: result.user };
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update current user profile (name)' })
+  @ApiResponse({ status: 200, description: 'Updated user' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async updateMe(
+    @CurrentUser() user: RequestUser,
+    @Body() body: { name?: string },
+  ) {
+    const updated = await this.usersService.updateProfile(user.id, { name: body.name });
+    return { user: { id: updated.id, email: updated.email, name: updated.name } };
   }
+
 }
