@@ -141,4 +141,26 @@ export class AuthController {
     return { user: { id: updated.id, email: updated.email, name: updated.name } };
   }
 
+  /**
+   * Dev/test only — creates or retrieves a user and returns a valid session cookie.
+   * Disabled in production (NODE_ENV=production).
+   */
+  @Post('dev-session')
+  @ApiOperation({ summary: '[Dev/test only] Instantly create an authenticated session' })
+  @ApiResponse({ status: 201, description: 'Session created; cookie set' })
+  @ApiResponse({ status: 403, description: 'Not available in production' })
+  async devSession(
+    @Body() body: { email: string; name?: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (this.config.get('NODE_ENV') === 'production') {
+      res.status(403).json({ message: 'Not available in production' });
+      return;
+    }
+
+    const result = await this.authService.createDevSession(body.email, body.name);
+    this.setAuthCookie(res, result.accessToken);
+    return { user: result.user };
+  }
+
 }
