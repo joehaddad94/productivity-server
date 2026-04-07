@@ -25,7 +25,7 @@ export class TasksService {
       where: { userId_workspaceId: { userId, workspaceId } },
     });
     if (!membership) {
-      throw new ForbiddenException('You are not a member of this workspace');
+      throw new ForbiddenException("You don't have access to this workspace");
     }
   }
 
