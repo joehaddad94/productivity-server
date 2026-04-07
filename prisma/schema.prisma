@@ -89,6 +89,7 @@ model Project {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   notes     Note[]
 
+  @@index([workspaceId])
   @@map("projects")
 }
 
@@ -102,6 +103,7 @@ model Task {
   status         String    @default("pending")
   completedAt    DateTime? @map("completed_at")
   parentTaskId   String?   @map("parent_task_id")
+  sortOrder      Int       @default(0) @map("sort_order")
   createdAt      DateTime  @default(now()) @map("created_at")
   deletedAt      DateTime? @map("deleted_at")
 
@@ -110,6 +112,9 @@ model Task {
   subtasks    Task[]    @relation("Subtask")
   notes       Note[]
 
+  @@index([workspaceId])
+  @@index([workspaceId, status])
+  @@index([parentTaskId])
   @@map("tasks")
 }
 
@@ -132,6 +137,8 @@ model Note {
   assignee  User?      @relation("NoteAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   task      Task?      @relation(fields: [taskId], references: [id], onDelete: SetNull)
 
+  @@index([workspaceId])
+  @@index([workspaceId, projectId])
   @@map("notes")
 }
 
@@ -149,5 +156,6 @@ model DailyStat {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, userId, date])
+  @@index([userId])
   @@map("daily_stats")
 }

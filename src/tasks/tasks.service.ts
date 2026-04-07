@@ -9,6 +9,7 @@ import { Task } from '@prisma/client';
 import { CreateTaskDto, TaskStatus } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { QueryTaskDto } from './dto/query-task.dto';
+import { BulkTaskDto, BulkTaskAction } from './dto/bulk-task.dto';
 
 type TaskWithSubtasks = Task & { subtasks: Task[] };
 
@@ -24,7 +25,7 @@ export class TasksService {
       where: { userId_workspaceId: { userId, workspaceId } },
     });
     if (!membership) {
-      throw new ForbiddenException('You are not a member of this workspace');
+      throw new ForbiddenException("You don't have access to this workspace");
     }
   }
 
@@ -32,43 +33,53 @@ export class TasksService {
     workspaceId: string,
     userId: string,
     query: QueryTaskDto,
-  ): Promise<TaskWithSubtasks[]> {
+  ): Promise<{ tasks: TaskWithSubtasks[]; total: number }> {
     await this.assertMember(workspaceId, userId);
 
-    const tasks = await this.prisma.task.findMany({
-      where: {
-        workspaceId,
-        deletedAt: null,
-        parentTaskId: null,
-        ...(query.status ? { status: query.status } : {}),
-        ...(query.priority ? { priority: query.priority } : {}),
-        ...(query.search
-          ? {
-              OR: [
-                { title: { contains: query.search, mode: 'insensitive' } },
-                { description: { contains: query.search, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-        ...(query.dueBefore || query.dueAfter
-          ? {
-              dueDate: {
-                ...(query.dueBefore ? { lte: new Date(query.dueBefore) } : {}),
-                ...(query.dueAfter ? { gte: new Date(query.dueAfter) } : {}),
-              },
-            }
-          : {}),
-      },
-      include: {
-        subtasks: {
-          where: { deletedAt: null },
-          orderBy: { createdAt: 'asc' },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const where = {
+      workspaceId,
+      deletedAt: null,
+      parentTaskId: null,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.priority ? { priority: query.priority } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { title: { contains: query.search, mode: 'insensitive' as const } },
+              { description: { contains: query.search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+      ...(query.dueBefore || query.dueAfter
+        ? {
+            dueDate: {
+              ...(query.dueBefore ? { lte: new Date(query.dueBefore) } : {}),
+              ...(query.dueAfter ? { gte: new Date(query.dueAfter) } : {}),
+            },
+          }
+        : {}),
+    };
 
-    return tasks as TaskWithSubtasks[];
+    const limit = query.limit ?? 50;
+    const skip = query.skip ?? 0;
+
+    const [tasks, total] = await this.prisma.$transaction([
+      this.prisma.task.findMany({
+        where,
+        include: {
+          subtasks: {
+            where: { deletedAt: null },
+            orderBy: { createdAt: 'asc' },
+          },
+        },
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+        take: limit,
+        skip,
+      }),
+      this.prisma.task.count({ where }),
+    ]);
+
+    return { tasks: tasks as TaskWithSubtasks[], total };
   }
 
   async create(
@@ -136,6 +147,7 @@ export class TasksService {
         ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.parentTaskId !== undefined ? { parentTaskId: dto.parentTaskId } : {}),
+        ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
         ...(isCompleting ? { completedAt: new Date() } : {}),
       },
     });
@@ -153,5 +165,68 @@ export class TasksService {
       where: { id },
       data: { deletedAt: new Date() },
     });
+  }
+
+  /** Reorder tasks: accepts ordered array of ids, assigns sortOrder 0..n-1 */
+  async reorder(
+    workspaceId: string,
+    userId: string,
+    ids: string[],
+  ): Promise<void> {
+    await this.assertMember(workspaceId, userId);
+    await this.prisma.$transaction(
+      ids.map((id, index) =>
+        this.prisma.task.update({
+          where: { id, workspaceId },
+          data: { sortOrder: index },
+        }),
+      ),
+    );
+  }
+
+  async bulkUpdate(
+    workspaceId: string,
+    userId: string,
+    dto: BulkTaskDto,
+  ): Promise<{ affected: number }> {
+    await this.assertMember(workspaceId, userId);
+
+    // Validate all requested IDs belong to this workspace and are not deleted
+    const tasks = await this.prisma.task.findMany({
+      where: { id: { in: dto.ids }, workspaceId, deletedAt: null },
+      select: { id: true, status: true },
+    });
+
+    if (tasks.length === 0) {
+      return { affected: 0 };
+    }
+
+    const validIds = tasks.map((t) => t.id);
+
+    if (dto.action === BulkTaskAction.DELETE) {
+      await this.prisma.task.updateMany({
+        where: { id: { in: validIds } },
+        data: { deletedAt: new Date() },
+      });
+      return { affected: validIds.length };
+    }
+
+    // action === complete
+    const alreadyDoneIds = new Set(
+      tasks.filter((t) => t.status === TaskStatus.COMPLETED).map((t) => t.id),
+    );
+    const toCompleteIds = validIds.filter((id) => !alreadyDoneIds.has(id));
+
+    if (toCompleteIds.length > 0) {
+      await this.prisma.task.updateMany({
+        where: { id: { in: toCompleteIds } },
+        data: { status: TaskStatus.COMPLETED, completedAt: new Date() },
+      });
+      await this.analytics.logStat(workspaceId, userId, {
+        tasksCompleted: toCompleteIds.length,
+      });
+    }
+
+    return { affected: toCompleteIds.length };
   }
 }

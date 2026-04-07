@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 import { TaskPriority, TaskStatus } from './create-task.dto';
 
 export class QueryTaskDto {
@@ -27,4 +28,19 @@ export class QueryTaskDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional({ description: 'Max number of records to return (default 50)', default: 50 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  @Type(() => Number)
+  limit?: number;
+
+  @ApiPropertyOptional({ description: 'Number of records to skip (for pagination)', default: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Type(() => Number)
+  skip?: number;
 }

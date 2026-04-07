@@ -143,7 +143,7 @@ export class WorkspacesService {
     const requesterMembership = await this.prisma.workspaceMember.findUnique({
       where: { userId_workspaceId: { userId: requesterId, workspaceId } },
     });
-    if (!requesterMembership) throw new ForbiddenException('Not a workspace member');
+    if (!requesterMembership) throw new ForbiddenException("You don't have access to this workspace");
 
     return this.prisma.workspaceMember.findMany({
       where: { workspaceId },
@@ -161,7 +161,7 @@ export class WorkspacesService {
     const requesterMembership = await this.prisma.workspaceMember.findUnique({
       where: { userId_workspaceId: { userId: requesterId, workspaceId } },
     });
-    if (!requesterMembership) throw new ForbiddenException('Not a workspace member');
+    if (!requesterMembership) throw new ForbiddenException("You don't have access to this workspace");
 
     const workspace = await this.prisma.workspace.findUnique({ where: { id: workspaceId } });
     if (!workspace) throw new NotFoundException('Workspace not found');
@@ -214,7 +214,7 @@ export class WorkspacesService {
     const requesterMembership = await this.prisma.workspaceMember.findUnique({
       where: { userId_workspaceId: { userId: requesterId, workspaceId } },
     });
-    if (!requesterMembership) throw new ForbiddenException('Not a workspace member');
+    if (!requesterMembership) throw new ForbiddenException("You don't have access to this workspace");
     if (requesterMembership.role !== 'owner') {
       throw new ForbiddenException('Only the workspace owner can remove members');
     }
@@ -238,7 +238,7 @@ export class WorkspacesService {
     const requesterMembership = await this.prisma.workspaceMember.findUnique({
       where: { userId_workspaceId: { userId: requesterId, workspaceId } },
     });
-    if (!requesterMembership) throw new ForbiddenException('Not a workspace member');
+    if (!requesterMembership) throw new ForbiddenException("You don't have access to this workspace");
     if (requesterMembership.role !== 'owner') {
       throw new ForbiddenException('Only the workspace owner can update member roles');
     }
