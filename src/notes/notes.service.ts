@@ -45,6 +45,7 @@ export class NotesService {
         : {}),
       ...(tagList?.length ? { tags: { hasSome: tagList } } : {}),
       ...(query.projectId ? { projectId: query.projectId } : {}),
+      ...(query.taskId ? { taskId: query.taskId } : {}),
     };
 
     const limit = query.limit ?? 50;

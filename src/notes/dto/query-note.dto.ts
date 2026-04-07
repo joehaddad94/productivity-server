@@ -18,6 +18,11 @@ export class QueryNoteDto {
   @IsUUID()
   projectId?: string;
 
+  @ApiPropertyOptional({ description: 'Filter notes linked to a specific task' })
+  @IsOptional()
+  @IsUUID()
+  taskId?: string;
+
   @ApiPropertyOptional({ description: 'Max number of records to return (default 50)', default: 50 })
   @IsOptional()
   @IsInt()
