@@ -36,7 +36,7 @@ export class AnalyticsController {
       user.id,
       query,
     );
-    return analytics;
+    return { analytics };
   }
 
   @Post('log')
