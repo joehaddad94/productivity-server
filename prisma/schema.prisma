@@ -103,6 +103,7 @@ model Task {
   title          String
   description    String?
   dueDate        DateTime? @map("due_date") @db.Date
+  dueTime        String?   @map("due_time")
   priority       String?
   status         String    @default("pending")
   completedAt    DateTime? @map("completed_at")
