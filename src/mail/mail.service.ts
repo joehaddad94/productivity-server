@@ -41,6 +41,32 @@ export class MailService {
     }
   }
 
+  async sendNotificationEmail(to: string, title: string, body: string): Promise<boolean> {
+    const ctx = this.getClient();
+    if (!ctx) return false;
+
+    try {
+      await ctx.emails.sendTransacEmail({
+        sender: ctx.from,
+        to: [{ email: to }],
+        subject: title,
+        htmlContent: `
+          <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px">
+            <h2 style="color:#047857;margin-bottom:8px">${title}</h2>
+            <p style="color:#374151;font-size:15px">${body}</p>
+            <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
+            <p style="color:#9ca3af;font-size:12px">You're receiving this because you have email notifications enabled in Tasky. <a href="#" style="color:#047857">Manage preferences</a></p>
+          </div>
+        `.trim(),
+      });
+      this.logger.log(`Notification email sent to ${to}: ${title}`);
+      return true;
+    } catch (err) {
+      this.logger.error(`Failed to send notification email to ${to}: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
+    }
+  }
+
   async sendInviteEmail(to: string, workspaceName: string, inviteLink: string, recipientName: string): Promise<boolean> {
     const ctx = this.getClient();
     if (!ctx) return false;
