@@ -6,7 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { Task } from '@prisma/client';
-import { CreateTaskDto, TaskStatus } from './dto/create-task.dto';
+import { CreateTaskDto, RecurrenceRule, TaskStatus } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { QueryTaskDto } from './dto/query-task.dto';
 import { BulkTaskDto, BulkTaskAction } from './dto/bulk-task.dto';
@@ -99,6 +99,7 @@ export class TasksService {
         priority: dto.priority,
         status: dto.status ?? TaskStatus.PENDING,
         parentTaskId: dto.parentTaskId,
+        recurrenceRule: dto.recurrenceRule,
         completedAt:
           dto.status === TaskStatus.COMPLETED ? new Date() : undefined,
       },
@@ -150,15 +151,55 @@ export class TasksService {
         ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.parentTaskId !== undefined ? { parentTaskId: dto.parentTaskId } : {}),
         ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+        ...(dto.recurrenceRule !== undefined ? { recurrenceRule: dto.recurrenceRule ?? null } : {}),
         ...(isCompleting ? { completedAt: new Date() } : {}),
       },
     });
 
     if (isCompleting) {
       await this.analytics.logStat(workspaceId, userId, { tasksCompleted: 1 });
+      await this.spawnNextRecurrence(existing, workspaceId);
     }
 
     return updated;
+  }
+
+  private async spawnNextRecurrence(
+    task: Task,
+    workspaceId: string,
+  ): Promise<void> {
+    const rule = (task as any).recurrenceRule as RecurrenceRule | null;
+    if (!rule || !(task as any).dueDate) return;
+
+    const currentDue = new Date((task as any).dueDate as Date);
+    let nextDue: Date;
+
+    if (rule === RecurrenceRule.DAILY) {
+      nextDue = new Date(currentDue);
+      nextDue.setDate(nextDue.getDate() + 1);
+    } else if (rule === RecurrenceRule.WEEKLY) {
+      nextDue = new Date(currentDue);
+      nextDue.setDate(nextDue.getDate() + 7);
+    } else {
+      // MONTHLY
+      nextDue = new Date(currentDue);
+      nextDue.setMonth(nextDue.getMonth() + 1);
+    }
+
+    await this.prisma.task.create({
+      data: {
+        workspaceId,
+        title: (task as any).title,
+        description: (task as any).description,
+        dueDate: nextDue,
+        dueTime: (task as any).dueTime,
+        priority: (task as any).priority,
+        status: TaskStatus.PENDING,
+        recurrenceRule: rule,
+        recurrenceParentId: task.id,
+        sortOrder: (task as any).sortOrder ?? 0,
+      },
+    });
   }
 
   async logFocus(
