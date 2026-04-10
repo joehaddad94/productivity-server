@@ -159,6 +159,23 @@ export class TasksService {
     return updated;
   }
 
+  async logFocus(
+    workspaceId: string,
+    id: string,
+    userId: string,
+    minutes: number,
+  ): Promise<Task> {
+    await this.findOne(workspaceId, id, userId);
+    const updated = await this.prisma.task.update({
+      where: { id },
+      data: { focusMinutes: { increment: minutes } },
+    });
+    if (minutes > 0) {
+      await this.analytics.logStat(workspaceId, userId, { focusMinutes: minutes });
+    }
+    return updated;
+  }
+
   async remove(workspaceId: string, id: string, userId: string): Promise<void> {
     await this.findOne(workspaceId, id, userId);
     await this.prisma.task.update({

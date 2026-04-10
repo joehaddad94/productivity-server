@@ -19,10 +19,13 @@ model User {
   timezone   String?
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  sessions           Session[]
-  workspaceMembers   WorkspaceMember[]
-  assignedNotes      Note[]             @relation("NoteAssignee")
-  dailyStats         DailyStat[]
+  sessions              Session[]
+  workspaceMembers      WorkspaceMember[]
+  assignedNotes         Note[]                @relation("NoteAssignee")
+  dailyStats            DailyStat[]
+  notifications         Notification[]
+  notificationSettings  NotificationSettings?
+  pushSubscriptions     PushSubscription[]
 
   @@map("users")
 }
@@ -57,11 +60,12 @@ model Workspace {
   isPersonal Boolean  @default(false) @map("is_personal")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  members     WorkspaceMember[]
-  projects    Project[]
-  tasks       Task[]
-  notes       Note[]
-  dailyStats  DailyStat[]
+  members       WorkspaceMember[]
+  projects      Project[]
+  tasks         Task[]
+  notes         Note[]
+  dailyStats    DailyStat[]
+  notifications Notification[]
 
   @@map("workspaces")
 }
@@ -103,6 +107,7 @@ model Task {
   status         String    @default("pending")
   completedAt    DateTime? @map("completed_at")
   parentTaskId   String?   @map("parent_task_id")
+  focusMinutes   Int       @default(0) @map("focus_minutes")
   sortOrder      Int       @default(0) @map("sort_order")
   createdAt      DateTime  @default(now()) @map("created_at")
   deletedAt      DateTime? @map("deleted_at")
@@ -140,6 +145,53 @@ model Note {
   @@index([workspaceId])
   @@index([workspaceId, projectId])
   @@map("notes")
+}
+
+// --- Notifications ---
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  workspaceId String   @map("workspace_id")
+  taskId      String?  @map("task_id")
+  type        String   // due_today | overdue | daily_agenda
+  title       String
+  body        String
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([userId, workspaceId])
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+model NotificationSettings {
+  id               String  @id @default(uuid())
+  userId           String  @unique @map("user_id")
+  inApp            Boolean @default(true)  @map("in_app")
+  email            Boolean @default(false)
+  push             Boolean @default(false)
+  dailyAgendaTime  String  @default("08:00") @map("daily_agenda_time")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_settings")
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  endpoint  String
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint])
+  @@map("push_subscriptions")
 }
 
 // --- Analytics ---

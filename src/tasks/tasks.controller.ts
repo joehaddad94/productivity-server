@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   UseGuards,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ParseUUIDPipe } from '@nestjs/common/pipes';
@@ -75,6 +76,20 @@ export class TasksController {
     @Body() dto: UpdateTaskDto,
   ) {
     const task = await this.tasksService.update(workspaceId, id, user.id, dto);
+    return { task };
+  }
+
+  @Post(':id/log-focus')
+  @ApiOperation({ summary: 'Increment per-task focus minutes and log to daily analytics' })
+  @ApiResponse({ status: 201, description: 'Focus minutes logged' })
+  @ApiResponse({ status: 404, description: 'Task not found' })
+  async logFocus(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: RequestUser,
+    @Body('minutes', ParseIntPipe) minutes: number,
+  ) {
+    const task = await this.tasksService.logFocus(workspaceId, id, user.id, minutes);
     return { task };
   }
 
