@@ -9,6 +9,12 @@ import {
   MinLength,
 } from 'class-validator';
 
+export enum RecurrenceRule {
+  DAILY = 'DAILY',
+  WEEKLY = 'WEEKLY',
+  MONTHLY = 'MONTHLY',
+}
+
 export enum TaskPriority {
   LOW = 'low',
   MEDIUM = 'medium',
@@ -58,4 +64,9 @@ export class CreateTaskDto {
   @IsOptional()
   @IsUUID()
   parentTaskId?: string;
+
+  @ApiPropertyOptional({ enum: RecurrenceRule })
+  @IsOptional()
+  @IsEnum(RecurrenceRule)
+  recurrenceRule?: RecurrenceRule;
 }

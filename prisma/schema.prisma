@@ -108,15 +108,19 @@ model Task {
   status         String    @default("pending")
   completedAt    DateTime? @map("completed_at")
   parentTaskId   String?   @map("parent_task_id")
-  focusMinutes   Int       @default(0) @map("focus_minutes")
-  sortOrder      Int       @default(0) @map("sort_order")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  deletedAt      DateTime? @map("deleted_at")
+  focusMinutes        Int       @default(0) @map("focus_minutes")
+  sortOrder           Int       @default(0) @map("sort_order")
+  recurrenceRule      String?   @map("recurrence_rule")
+  recurrenceParentId  String?   @map("recurrence_parent_id")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  deletedAt           DateTime? @map("deleted_at")
 
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  parentTask  Task?     @relation("Subtask", fields: [parentTaskId], references: [id])
-  subtasks    Task[]    @relation("Subtask")
-  notes       Note[]
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parentTask       Task?     @relation("Subtask", fields: [parentTaskId], references: [id])
+  subtasks         Task[]    @relation("Subtask")
+  recurrenceParent Task?     @relation("RecurringInstance", fields: [recurrenceParentId], references: [id])
+  recurrenceChildren Task[]  @relation("RecurringInstance")
+  notes            Note[]
 
   @@index([workspaceId])
   @@index([workspaceId, status])
