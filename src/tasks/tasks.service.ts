@@ -95,6 +95,7 @@ export class TasksService {
         title: dto.title.trim(),
         description: dto.description,
         dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+        dueTime: dto.dueTime,
         priority: dto.priority,
         status: dto.status ?? TaskStatus.PENDING,
         parentTaskId: dto.parentTaskId,
@@ -144,6 +145,7 @@ export class TasksService {
         ...(dto.dueDate !== undefined
           ? { dueDate: dto.dueDate ? new Date(dto.dueDate) : null }
           : {}),
+        ...(dto.dueTime !== undefined ? { dueTime: dto.dueTime ?? null } : {}),
         ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.parentTaskId !== undefined ? { parentTaskId: dto.parentTaskId } : {}),

@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -36,6 +37,12 @@ export class CreateTaskDto {
   @IsOptional()
   @IsString()
   dueDate?: string;
+
+  @ApiPropertyOptional({ description: 'HH:MM time string' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{2}:\d{2}$/, { message: 'dueTime must be HH:MM' })
+  dueTime?: string;
 
   @ApiPropertyOptional({ enum: TaskPriority })
   @IsOptional()
