@@ -33,8 +33,8 @@ export class MagicLinkService {
         expiresAt,
       } as Prisma.VerificationTokenCreateInput,
     });
-    const baseUrl = this.config.get('APP_URL') ?? 'http://localhost:8000';
-    const magicLink = `${baseUrl}/auth/verify?token=${token}`;
+    const baseUrl = this.config.get('APP_URL') ?? 'http://localhost:5173';
+    const magicLink = `${baseUrl}/verify?token=${token}`;
     return { magicLink };
   }
 
