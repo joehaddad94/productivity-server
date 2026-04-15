@@ -6,6 +6,7 @@ import { AUTH_CONFIG } from './config/auth-config';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
+import { VerifyController } from './verify.controller';
 import { AuthService } from './auth.service';
 import { SessionService } from './services/session.service';
 import { MagicLinkService } from './services/magic-link.service';
@@ -26,7 +27,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       }),
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, VerifyController],
   providers: [AuthService, SessionService, MagicLinkService, JwtStrategy, JwtAuthGuard],
   exports: [AuthService, JwtModule, JwtAuthGuard],
 })
