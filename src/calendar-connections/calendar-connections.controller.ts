@@ -11,7 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, RequestUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CalendarConnectionsService } from './calendar-connections.service';
+import { CalendarConnectionsService, type CalendarEvent } from './calendar-connections.service';
 
 @ApiTags('calendar-connections')
 @Controller('calendar-connections')
@@ -85,7 +85,7 @@ export class CalendarConnectionsController {
     @CurrentUser() user: RequestUser,
     @Query('start') start: string,
     @Query('end') end: string,
-  ) {
+  ): Promise<CalendarEvent[]> {
     return this.service.getEvents(user.id, start, end);
   }
 }

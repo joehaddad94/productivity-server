@@ -20,7 +20,7 @@ interface MicrosoftTokenResponse {
   token_type: string;
 }
 
-interface CalendarEvent {
+export interface CalendarEvent {
   id: string;
   title: string;
   start: string;
