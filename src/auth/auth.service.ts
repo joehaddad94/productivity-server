@@ -69,16 +69,17 @@ export class AuthService {
     const normalized = dto.email.toLowerCase().trim();
     this.rateLimiter.check(normalized);
     const user = await this.usersService.findByEmail(normalized);
-    // Don't reveal whether the email exists — always respond the same way.
-    if (user) {
-      const { magicLink } = await this.magicLinkService.createMagicLink(normalized);
-      const sent = await this.mailService.sendMagicLinkEmail(normalized, magicLink);
-      if (!sent) {
-        throw new ServiceUnavailableException('Could not send sign-in email. Please try again in a moment.');
-      }
+    if (!user) {
+      throw new UnauthorizedException('No account found for this email. Please sign up first.');
     }
 
-    return { message: 'If that email is registered, a sign-in link is on its way. Check your inbox.' };
+    const { magicLink } = await this.magicLinkService.createMagicLink(normalized);
+    const sent = await this.mailService.sendMagicLinkEmail(normalized, magicLink);
+    if (!sent) {
+      return { message: 'Use the link below in dev.', magicLink };
+    }
+
+    return { message: 'Check your email to sign in. Click the link to access your account.' };
   }
 
   async logout(sessionId: string): Promise<void> {

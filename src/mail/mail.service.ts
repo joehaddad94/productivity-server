@@ -97,9 +97,45 @@ export class MailService {
 
   private getMagicLinkHtml(magicLink: string): string {
     return `
-      <p>Click the link below to sign in. It expires in 15 minutes.</p>
-      <p><a href="${magicLink}">Sign in</a></p>
-      <p>If you didn't request this, you can ignore this email.</p>
+      <div style="margin:0;background:#f4f4f5;padding:28px 14px;font-family:Inter,'Segoe UI',Arial,sans-serif;color:#0a0a0a;">
+        <div style="max-width:560px;margin:0 auto;">
+          <div style="margin:0 auto 12px;width:max-content;padding:6px 10px;border-radius:999px;background:#0478571a;color:#047857;font-size:12px;font-weight:600;letter-spacing:.02em;">
+            Tasky
+          </div>
+
+          <div style="background:#ffffff;border:1px solid #e4e4e7;border-radius:16px;box-shadow:0 8px 24px rgba(10,10,10,.06);padding:28px;">
+            <h2 style="margin:0 0 10px;font-size:22px;line-height:1.25;color:#0a0a0a;">Sign in to Tasky</h2>
+            <p style="margin:0 0 18px;font-size:14px;line-height:1.65;color:#71717a;">
+              Use the secure link below to access your account. This sign-in link expires in <strong>15 minutes</strong>.
+            </p>
+
+            <p style="margin:0 0 20px;">
+              <a
+                href="${magicLink}"
+                style="display:inline-block;background:#047857;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:10px;font-size:14px;font-weight:600;"
+              >
+                Sign in to Tasky
+              </a>
+            </p>
+
+            <p style="margin:0 0 8px;line-height:1.5;">
+              Or copy and paste this link in your browser:
+            </p>
+
+            <p style="margin:0 0 18px;font-size:12px;line-height:1.6;color:#71717a;word-break:break-all;">
+              <a href="${magicLink}" style="color:#047857;text-decoration:underline;">${magicLink}</a>
+            </p>
+
+            <p style="margin:0;font-size:12px;line-height:1.6;color:#71717a;">
+              You received this because someone requested a sign-in link for your email. If this was not you, you can safely ignore this message.
+            </p>
+          </div>
+
+          <p style="margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;">
+            Tasky • Track tasks • Focus better • Stay consistent
+          </p>
+        </div>
+      </div>
     `.trim();
   }
 }
