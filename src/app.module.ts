@@ -13,6 +13,7 @@ import { TasksModule } from './tasks/tasks.module';
 import { ProjectsModule } from './projects/projects.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { CalendarConnectionsModule } from './calendar-connections/calendar-connections.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     ProjectsModule,
     AnalyticsModule,
     NotificationsModule,
+    CalendarConnectionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

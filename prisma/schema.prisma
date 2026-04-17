@@ -26,6 +26,7 @@ model User {
   notifications         Notification[]
   notificationSettings  NotificationSettings?
   pushSubscriptions     PushSubscription[]
+  calendarConnections   CalendarConnection[]
 
   @@map("users")
 }
@@ -215,4 +216,20 @@ model DailyStat {
   @@unique([workspaceId, userId, date])
   @@index([userId])
   @@map("daily_stats")
+}
+
+// --- Calendar integrations ---
+model CalendarConnection {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  provider     String    // "google" | "microsoft"
+  accessToken  String    @map("access_token")
+  refreshToken String?   @map("refresh_token")
+  expiresAt    DateTime? @map("expires_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@map("calendar_connections")
 }
