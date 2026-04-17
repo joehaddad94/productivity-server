@@ -57,6 +57,26 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Grafana dashboard sync (code-first)
+
+This backend can publish a starter API performance dashboard to Grafana Cloud directly from code.
+
+1) Add these env vars to `.env.local`:
+
+```bash
+GRAFANA_URL=https://your-stack.grafana.net
+GRAFANA_API_TOKEN=glsa_your_token
+OTEL_SERVICE_NAME=tasky-server
+```
+
+2) Push dashboard from this repo:
+
+```bash
+npm run grafana:sync-dashboard
+```
+
+The dashboard includes request rate, error rate, p95/p99 latency, and slowest routes to help identify API bottlenecks.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
