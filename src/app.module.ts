@@ -9,6 +9,7 @@ import { UsersModule } from './users/users.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { MailModule } from './mail/mail.module';
 import { NotesModule } from './notes/notes.module';
+import { TagsModule } from './tags/tags.module';
 import { TasksModule } from './tasks/tasks.module';
 import { ProjectsModule } from './projects/projects.module';
 import { AnalyticsModule } from './analytics/analytics.module';
@@ -28,6 +29,7 @@ import { CalendarConnectionsModule } from './calendar-connections/calendar-conne
     AuthModule,
     WorkspacesModule,
     NotesModule,
+    TagsModule,
     TasksModule,
     ProjectsModule,
     AnalyticsModule,

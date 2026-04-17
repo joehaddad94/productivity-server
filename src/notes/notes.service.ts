@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -11,6 +12,8 @@ import { QueryNoteDto } from './dto/query-note.dto';
 
 @Injectable()
 export class NotesService {
+  private readonly logger = new Logger(NotesService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   private async assertMember(workspaceId: string, userId: string): Promise<void> {
@@ -27,6 +30,7 @@ export class NotesService {
     userId: string,
     query: QueryNoteDto,
   ): Promise<{ notes: Note[]; total: number }> {
+    const startedAt = Date.now();
     await this.assertMember(workspaceId, userId);
 
     const tagList = query.tags
@@ -43,7 +47,9 @@ export class NotesService {
             ],
           }
         : {}),
-      ...(tagList?.length ? { tags: { hasSome: tagList } } : {}),
+      ...(tagList?.length
+        ? { tags: query.tagMode === 'all' ? { hasEvery: tagList } : { hasSome: tagList } }
+        : {}),
       ...(query.projectId ? { projectId: query.projectId } : {}),
       ...(query.taskId ? { taskId: query.taskId } : {}),
     };
@@ -56,13 +62,18 @@ export class NotesService {
       this.prisma.note.count({ where }),
     ]);
 
+    this.logger.log(
+      `listNotes workspace=${workspaceId} user=${userId} notes=${notes.length}/${total} +${Date.now() - startedAt}ms`,
+    );
+
     return { notes, total };
   }
 
   async create(workspaceId: string, userId: string, dto: CreateNoteDto): Promise<Note> {
+    const startedAt = Date.now();
     await this.assertMember(workspaceId, userId);
 
-    return this.prisma.note.create({
+    const note = await this.prisma.note.create({
       data: {
         workspaceId,
         title: dto.title.trim(),
@@ -74,6 +85,12 @@ export class NotesService {
         status: dto.status,
       },
     });
+
+    this.logger.log(
+      `createNote workspace=${workspaceId} user=${userId} note=${note.id} +${Date.now() - startedAt}ms`,
+    );
+
+    return note;
   }
 
   async findOne(workspaceId: string, id: string, userId: string): Promise<Note> {

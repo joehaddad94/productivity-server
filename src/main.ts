@@ -6,6 +6,16 @@ import * as cookieParser from 'cookie-parser';
 import { trace } from '@opentelemetry/api';
 import { AppModule } from './app.module';
 
+function normalizeRoute(url: string): string {
+  const [pathOnly] = url.split('?');
+  return pathOnly
+    .replace(
+      /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi,
+      ':uuid',
+    )
+    .replace(/\/\d+(?=\/|$)/g, '/:id');
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const httpLogger = new Logger('HTTP');
@@ -16,9 +26,20 @@ async function bootstrap() {
     res.on('finish', () => {
       const ms = Date.now() - start;
       const { statusCode } = res;
-      const log = `${method} ${url} ${statusCode} +${ms}ms`;
+      const normalized = normalizeRoute(url);
+      const isPreflight = method === 'OPTIONS';
+      const isSlow = ms >= 1000;
+
+      // Keep preflight logs compact since browsers produce many of them.
+      if (isPreflight) {
+        if (ms >= 200) httpLogger.warn(`PREFLIGHT ${normalized} ${statusCode} +${ms}ms`);
+        return;
+      }
+
+      const slowTag = isSlow ? ' SLOW' : '';
+      const log = `${method} ${normalized} ${statusCode} +${ms}ms${slowTag}`;
       if (statusCode >= 500) httpLogger.error(log);
-      else if (statusCode >= 400) httpLogger.warn(log);
+      else if (statusCode >= 400 || isSlow) httpLogger.warn(log);
       else httpLogger.log(log);
     });
     next();

@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class QueryNoteDto {
@@ -12,6 +12,15 @@ export class QueryNoteDto {
   @IsOptional()
   @IsString()
   tags?: string;
+
+  @ApiPropertyOptional({
+    description: 'Whether to match any or all of the given tags (default any)',
+    enum: ['any', 'all'],
+    default: 'any',
+  })
+  @IsOptional()
+  @IsEnum(['any', 'all'])
+  tagMode?: 'any' | 'all';
 
   @ApiPropertyOptional()
   @IsOptional()
