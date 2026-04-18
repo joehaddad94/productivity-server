@@ -117,9 +117,10 @@ export class NotesService {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
         ...(dto.content !== undefined ? { content: dto.content } : {}),
         ...(dto.tags !== undefined ? { tags: dto.tags } : {}),
-        ...(dto.projectId !== undefined ? { projectId: dto.projectId } : {}),
-        ...(dto.taskId !== undefined ? { taskId: dto.taskId } : {}),
-        ...(dto.assigneeId !== undefined ? { assigneeId: dto.assigneeId } : {}),
+        // Relations: null → unlink, string → link, undefined → leave untouched.
+        ...('projectId' in dto ? { projectId: dto.projectId ?? null } : {}),
+        ...('taskId' in dto ? { taskId: dto.taskId ?? null } : {}),
+        ...('assigneeId' in dto ? { assigneeId: dto.assigneeId ?? null } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
       },
     });
