@@ -9,7 +9,7 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { QueryProjectDto } from './dto/query-project.dto';
 
-type ProjectWithNoteCount = Project & { _count: { notes: number } };
+type ProjectWithCount = Project & { _count: { notes: number; tasks: number } };
 
 @Injectable()
 export class ProjectsService {
@@ -28,7 +28,7 @@ export class ProjectsService {
     workspaceId: string,
     userId: string,
     query: QueryProjectDto = {},
-  ): Promise<{ projects: ProjectWithNoteCount[]; total: number }> {
+  ): Promise<{ projects: ProjectWithCount[]; total: number }> {
     await this.assertMember(workspaceId, userId);
 
     const limit = query.limit ?? 50;
@@ -38,7 +38,7 @@ export class ProjectsService {
     const [projects, total] = await this.prisma.$transaction([
       this.prisma.project.findMany({
         where,
-        include: { _count: { select: { notes: true } } },
+        include: { _count: { select: { notes: true, tasks: true } } },
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip,
@@ -46,7 +46,7 @@ export class ProjectsService {
       this.prisma.project.count({ where }),
     ]);
 
-    return { projects: projects as ProjectWithNoteCount[], total };
+    return { projects: projects as ProjectWithCount[], total };
   }
 
   async create(workspaceId: string, userId: string, dto: CreateProjectDto): Promise<Project> {
@@ -56,19 +56,22 @@ export class ProjectsService {
       data: {
         workspaceId,
         name: dto.name.trim(),
+        description: dto.description,
+        status: dto.status ?? 'active',
+        color: dto.color,
       },
     });
   }
 
-  async findOne(workspaceId: string, id: string, userId: string): Promise<ProjectWithNoteCount> {
+  async findOne(workspaceId: string, id: string, userId: string): Promise<ProjectWithCount> {
     await this.assertMember(workspaceId, userId);
 
     const project = await this.prisma.project.findFirst({
       where: { id, workspaceId },
-      include: { _count: { select: { notes: true } } },
+      include: { _count: { select: { notes: true, tasks: true } } },
     });
     if (!project) throw new NotFoundException('Project not found');
-    return project as ProjectWithNoteCount;
+    return project as ProjectWithCount;
   }
 
   async update(
@@ -83,6 +86,9 @@ export class ProjectsService {
       where: { id },
       data: {
         ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.status !== undefined ? { status: dto.status } : {}),
+        ...(dto.color !== undefined ? { color: dto.color } : {}),
       },
     });
   }

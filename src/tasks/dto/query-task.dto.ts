@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TaskPriority, TaskStatus } from './create-task.dto';
 
@@ -43,4 +43,9 @@ export class QueryTaskDto {
   @Min(0)
   @Type(() => Number)
   skip?: number;
+
+  @ApiPropertyOptional({ description: 'Filter tasks by project ID' })
+  @IsOptional()
+  @IsUUID()
+  projectId?: string;
 }
