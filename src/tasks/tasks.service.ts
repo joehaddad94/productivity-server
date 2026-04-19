@@ -58,6 +58,7 @@ export class TasksService {
             },
           }
         : {}),
+      ...(query.projectId ? { projectId: query.projectId } : {}),
     };
 
     const limit = query.limit ?? 50;
@@ -100,6 +101,7 @@ export class TasksService {
         status: dto.status ?? TaskStatus.PENDING,
         parentTaskId: dto.parentTaskId,
         recurrenceRule: dto.recurrenceRule,
+        projectId: dto.projectId,
         completedAt:
           dto.status === TaskStatus.COMPLETED ? new Date() : undefined,
       },

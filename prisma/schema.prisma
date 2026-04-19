@@ -89,10 +89,14 @@ model Project {
   id          String   @id @default(uuid())
   workspaceId String   @map("workspace_id")
   name        String
+  description String?
+  status      String   @default("active")
+  color       String?
   createdAt   DateTime @default(now()) @map("created_at")
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   notes     Note[]
+  tasks     Task[]
 
   @@index([workspaceId])
   @@map("projects")
@@ -113,6 +117,7 @@ model Task {
   sortOrder           Int       @default(0) @map("sort_order")
   recurrenceRule      String?   @map("recurrence_rule")
   recurrenceParentId  String?   @map("recurrence_parent_id")
+  projectId           String?   @map("project_id")
   createdAt           DateTime  @default(now()) @map("created_at")
   deletedAt           DateTime? @map("deleted_at")
 
@@ -122,10 +127,12 @@ model Task {
   recurrenceParent Task?     @relation("RecurringInstance", fields: [recurrenceParentId], references: [id])
   recurrenceChildren Task[]  @relation("RecurringInstance")
   notes            Note[]
+  project          Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId])
   @@index([workspaceId, status])
   @@index([parentTaskId])
+  @@index([workspaceId, projectId])
   @@map("tasks")
 }
 

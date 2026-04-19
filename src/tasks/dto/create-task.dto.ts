@@ -69,4 +69,9 @@ export class CreateTaskDto {
   @IsOptional()
   @IsEnum(RecurrenceRule)
   recurrenceRule?: RecurrenceRule;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  projectId?: string;
 }
