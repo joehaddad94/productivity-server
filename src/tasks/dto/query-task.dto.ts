@@ -1,13 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { TaskPriority, TaskStatus } from './create-task.dto';
+import { TaskPriority } from './create-task.dto';
 
 export class QueryTaskDto {
-  @ApiPropertyOptional({ enum: TaskStatus })
+  @ApiPropertyOptional({ description: 'Workspace task status id (UUID)' })
   @IsOptional()
-  @IsEnum(TaskStatus)
-  status?: TaskStatus;
+  @IsString()
+  @MaxLength(40)
+  status?: string;
 
   @ApiPropertyOptional({ enum: TaskPriority })
   @IsOptional()

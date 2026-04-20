@@ -61,12 +61,13 @@ model Workspace {
   isPersonal Boolean  @default(false) @map("is_personal")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  members       WorkspaceMember[]
-  projects      Project[]
-  tasks         Task[]
-  notes         Note[]
-  dailyStats    DailyStat[]
-  notifications Notification[]
+  members            WorkspaceMember[]
+  projects           Project[]
+  tasks              Task[]
+  notes              Note[]
+  dailyStats         DailyStat[]
+  notifications      Notification[]
+  workspaceTaskStatuses WorkspaceTaskStatus[]
 
   @@map("workspaces")
 }
@@ -82,6 +83,25 @@ model WorkspaceMember {
 
   @@unique([userId, workspaceId])
   @@map("workspace_members")
+}
+
+/// Per-workflow columns for tasks. `key` is set for the three built-in rows (pending / in_progress / completed); custom statuses use key = null.
+model WorkspaceTaskStatus {
+  id          String    @id @default(uuid())
+  workspaceId String    @map("workspace_id")
+  key         String?   @map("key")
+  name        String
+  sortOrder   Int       @map("sort_order")
+  isTerminal  Boolean   @default(false) @map("is_terminal")
+  color       String?
+  archivedAt  DateTime? @map("archived_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, sortOrder])
+  @@map("workspace_task_statuses")
 }
 
 // --- Projects & tasks ---

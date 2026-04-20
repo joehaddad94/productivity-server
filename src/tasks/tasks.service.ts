@@ -6,10 +6,11 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { Task } from '@prisma/client';
-import { CreateTaskDto, RecurrenceRule, TaskStatus } from './dto/create-task.dto';
+import { CreateTaskDto, RecurrenceRule } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { QueryTaskDto } from './dto/query-task.dto';
 import { BulkTaskDto, BulkTaskAction } from './dto/bulk-task.dto';
+import { TaskStatusesService } from '../task-statuses/task-statuses.service';
 
 type TaskWithSubtasks = Task & { subtasks: Task[] };
 
@@ -18,6 +19,7 @@ export class TasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly analytics: AnalyticsService,
+    private readonly taskStatuses: TaskStatusesService,
   ) {}
 
   private async assertMember(workspaceId: string, userId: string): Promise<void> {
@@ -90,6 +92,11 @@ export class TasksService {
   ): Promise<Task> {
     await this.assertMember(workspaceId, userId);
 
+    const statusId =
+      dto.status ?? (await this.taskStatuses.getDefaultOpenStatusId(workspaceId));
+    await this.taskStatuses.assertStatusInWorkspace(workspaceId, statusId);
+    const terminal = await this.taskStatuses.isTerminal(workspaceId, statusId);
+
     return this.prisma.task.create({
       data: {
         workspaceId,
@@ -98,12 +105,11 @@ export class TasksService {
         dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
         dueTime: dto.dueTime,
         priority: dto.priority,
-        status: dto.status ?? TaskStatus.PENDING,
+        status: statusId,
         parentTaskId: dto.parentTaskId,
         recurrenceRule: dto.recurrenceRule,
         projectId: dto.projectId,
-        completedAt:
-          dto.status === TaskStatus.COMPLETED ? new Date() : undefined,
+        completedAt: terminal ? new Date() : undefined,
       },
     });
   }
@@ -136,9 +142,17 @@ export class TasksService {
   ): Promise<Task> {
     const existing = await this.findOne(workspaceId, id, userId);
 
-    const isCompleting =
-      dto.status === TaskStatus.COMPLETED &&
-      existing.status !== TaskStatus.COMPLETED;
+    let completedAtPatch: Date | null | undefined = undefined;
+    let isCompleting = false;
+
+    if (dto.status !== undefined) {
+      await this.taskStatuses.assertStatusInWorkspace(workspaceId, dto.status);
+      const wasTerminal = await this.taskStatuses.isTerminal(workspaceId, existing.status);
+      const nowTerminal = await this.taskStatuses.isTerminal(workspaceId, dto.status);
+      isCompleting = nowTerminal && !wasTerminal;
+      if (isCompleting) completedAtPatch = new Date();
+      else if (!nowTerminal && wasTerminal) completedAtPatch = null;
+    }
 
     const updated = await this.prisma.task.update({
       where: { id },
@@ -154,7 +168,7 @@ export class TasksService {
         ...(dto.parentTaskId !== undefined ? { parentTaskId: dto.parentTaskId } : {}),
         ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
         ...(dto.recurrenceRule !== undefined ? { recurrenceRule: dto.recurrenceRule ?? null } : {}),
-        ...(isCompleting ? { completedAt: new Date() } : {}),
+        ...(completedAtPatch !== undefined ? { completedAt: completedAtPatch } : {}),
       },
     });
 
@@ -183,10 +197,11 @@ export class TasksService {
       nextDue = new Date(currentDue);
       nextDue.setDate(nextDue.getDate() + 7);
     } else {
-      // MONTHLY
       nextDue = new Date(currentDue);
       nextDue.setMonth(nextDue.getMonth() + 1);
     }
+
+    const openStatusId = await this.taskStatuses.getDefaultOpenStatusId(workspaceId);
 
     await this.prisma.task.create({
       data: {
@@ -196,7 +211,7 @@ export class TasksService {
         dueDate: nextDue,
         dueTime: (task as any).dueTime,
         priority: (task as any).priority,
-        status: TaskStatus.PENDING,
+        status: openStatusId,
         recurrenceRule: rule,
         recurrenceParentId: task.id,
         sortOrder: (task as any).sortOrder ?? 0,
@@ -253,7 +268,6 @@ export class TasksService {
   ): Promise<{ affected: number }> {
     await this.assertMember(workspaceId, userId);
 
-    // Validate all requested IDs belong to this workspace and are not deleted
     const tasks = await this.prisma.task.findMany({
       where: { id: { in: dto.ids }, workspaceId, deletedAt: null },
       select: { id: true, status: true },
@@ -273,16 +287,20 @@ export class TasksService {
       return { affected: validIds.length };
     }
 
-    // action === complete
+    const terminalIds = new Set(
+      await this.taskStatuses.terminalStatusIds(workspaceId),
+    );
     const alreadyDoneIds = new Set(
-      tasks.filter((t) => t.status === TaskStatus.COMPLETED).map((t) => t.id),
+      tasks.filter((t) => terminalIds.has(t.status)).map((t) => t.id),
     );
     const toCompleteIds = validIds.filter((id) => !alreadyDoneIds.has(id));
 
     if (toCompleteIds.length > 0) {
+      const terminalTarget =
+        await this.taskStatuses.getFirstTerminalStatusId(workspaceId);
       await this.prisma.task.updateMany({
         where: { id: { in: toCompleteIds } },
-        data: { status: TaskStatus.COMPLETED, completedAt: new Date() },
+        data: { status: terminalTarget, completedAt: new Date() },
       });
       await this.analytics.logStat(workspaceId, userId, {
         tasksCompleted: toCompleteIds.length,

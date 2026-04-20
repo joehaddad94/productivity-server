@@ -21,12 +21,6 @@ export enum TaskPriority {
   HIGH = 'high',
 }
 
-export enum TaskStatus {
-  PENDING = 'pending',
-  IN_PROGRESS = 'in_progress',
-  COMPLETED = 'completed',
-}
-
 export class CreateTaskDto {
   @ApiProperty({ example: 'My Task' })
   @IsString()
@@ -55,10 +49,11 @@ export class CreateTaskDto {
   @IsEnum(TaskPriority)
   priority?: TaskPriority;
 
-  @ApiPropertyOptional({ enum: TaskStatus, default: TaskStatus.PENDING })
+  @ApiPropertyOptional({ description: 'Workspace task status id (UUID from task-statuses)' })
   @IsOptional()
-  @IsEnum(TaskStatus)
-  status?: TaskStatus;
+  @IsString()
+  @MaxLength(40)
+  status?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

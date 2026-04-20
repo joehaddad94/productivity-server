@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
+import { TaskStatusesService } from '../task-statuses/task-statuses.service';
 import { NotificationsService } from './notifications.service';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class NotificationsScheduler {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly taskStatuses: TaskStatusesService,
   ) {}
 
   /** Daily agenda — every day at 08:00 UTC */
@@ -30,11 +32,15 @@ export class NotificationsScheduler {
       const settings = await this.notifications.getSettings(member.userId);
       if (!settings.inApp && !settings.email && !settings.push) continue;
 
+      const terminalIds = await this.taskStatuses.terminalStatusIds(member.workspaceId);
+      const notDone =
+        terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
+
       const dueTodayCount = await this.prisma.task.count({
         where: {
           workspaceId: member.workspaceId,
           dueDate: { gte: today, lt: tomorrow },
-          status: { not: 'completed' },
+          ...notDone,
           deletedAt: null,
         },
       });
@@ -43,7 +49,7 @@ export class NotificationsScheduler {
         where: {
           workspaceId: member.workspaceId,
           dueDate: { lt: today },
-          status: { not: 'completed' },
+          ...notDone,
           deletedAt: null,
         },
       });
@@ -81,11 +87,15 @@ export class NotificationsScheduler {
       const settings = await this.notifications.getSettings(member.userId);
       if (!settings.inApp && !settings.email && !settings.push) continue;
 
+      const terminalIds = await this.taskStatuses.terminalStatusIds(member.workspaceId);
+      const notDone =
+        terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
+
       const overdueTasks = await this.prisma.task.findMany({
         where: {
           workspaceId: member.workspaceId,
           dueDate: { lt: today },
-          status: { not: 'completed' },
+          ...notDone,
           deletedAt: null,
         },
         take: 5,
@@ -135,11 +145,15 @@ export class NotificationsScheduler {
       const settings = await this.notifications.getSettings(member.userId);
       if (!settings.inApp && !settings.email && !settings.push) continue;
 
+      const terminalIds = await this.taskStatuses.terminalStatusIds(member.workspaceId);
+      const notDone =
+        terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
+
       const dueTasks = await this.prisma.task.findMany({
         where: {
           workspaceId: member.workspaceId,
           dueDate: { gte: today, lt: tomorrow },
-          status: { not: 'completed' },
+          ...notDone,
           deletedAt: null,
         },
         take: 5,
