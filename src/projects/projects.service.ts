@@ -79,7 +79,7 @@ export class ProjectsService {
     id: string,
     userId: string,
     dto: UpdateProjectDto,
-  ): Promise<Project> {
+  ): Promise<ProjectWithCount> {
     await this.findOne(workspaceId, id, userId);
 
     return this.prisma.project.update({
@@ -90,7 +90,8 @@ export class ProjectsService {
         ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.color !== undefined ? { color: dto.color } : {}),
       },
-    });
+      include: { _count: { select: { notes: true, tasks: true } } },
+    }) as ProjectWithCount;
   }
 
   async remove(workspaceId: string, id: string, userId: string): Promise<void> {
