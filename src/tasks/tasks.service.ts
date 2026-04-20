@@ -168,6 +168,7 @@ export class TasksService {
         ...(dto.parentTaskId !== undefined ? { parentTaskId: dto.parentTaskId } : {}),
         ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
         ...(dto.recurrenceRule !== undefined ? { recurrenceRule: dto.recurrenceRule ?? null } : {}),
+        ...(dto.projectId !== undefined ? { projectId: dto.projectId ?? null } : {}),
         ...(completedAtPatch !== undefined ? { completedAt: completedAtPatch } : {}),
       },
     });
