@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { Task } from '@prisma/client';
 import { CreateTaskDto, RecurrenceRule } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -20,6 +21,7 @@ export class TasksService {
     private readonly prisma: PrismaService,
     private readonly analytics: AnalyticsService,
     private readonly taskStatuses: TaskStatusesService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private async assertMember(workspaceId: string, userId: string): Promise<void> {
@@ -176,9 +178,33 @@ export class TasksService {
     if (isCompleting) {
       await this.analytics.logStat(workspaceId, userId, { tasksCompleted: 1 });
       await this.spawnNextRecurrence(existing, workspaceId);
+      await this.notifyOtherMembers(workspaceId, userId, updated.title);
     }
 
     return updated;
+  }
+
+  private async notifyOtherMembers(workspaceId: string, completingUserId: string, taskTitle: string): Promise<void> {
+    const members = await this.prisma.workspaceMember.findMany({
+      where: { workspaceId, userId: { not: completingUserId } },
+      include: { user: true },
+    });
+    if (members.length === 0) return;
+
+    const completingUser = await this.prisma.user.findUnique({ where: { id: completingUserId } });
+    const name = completingUser?.name ?? completingUser?.email ?? 'Someone';
+
+    for (const member of members) {
+      await this.notificationsService.createAndDeliver({
+        userId: member.userId,
+        workspaceId,
+        type: 'task_completed',
+        title: 'Task completed',
+        body: `${name} completed "${taskTitle}"`,
+        userEmail: member.user.email,
+        userTimezone: member.user.timezone,
+      });
+    }
   }
 
   private async spawnNextRecurrence(

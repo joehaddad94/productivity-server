@@ -4,6 +4,25 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TaskStatusesService } from '../task-statuses/task-statuses.service';
 import { NotificationsService } from './notifications.service';
 
+function getLocalHour(timezone: string | null | undefined): number {
+  const tz = timezone ?? 'UTC';
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hour: 'numeric',
+      hour12: false,
+    }).formatToParts(new Date());
+    const h = parts.find((p) => p.type === 'hour')?.value ?? '0';
+    return parseInt(h, 10) % 24;
+  } catch {
+    return new Date().getUTCHours();
+  }
+}
+
+function parseHour(hhmm: string): number {
+  return parseInt(hhmm.split(':')[0] ?? '8', 10);
+}
+
 @Injectable()
 export class NotificationsScheduler {
   private readonly logger = new Logger(NotificationsScheduler.name);
@@ -14,15 +33,10 @@ export class NotificationsScheduler {
     private readonly taskStatuses: TaskStatusesService,
   ) {}
 
-  /** Daily agenda — every day at 08:00 UTC */
-  @Cron('0 8 * * *')
-  async dailyAgenda() {
-    this.logger.log('Running daily agenda notifications');
-
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  /** Runs every hour — dispatches per-user jobs based on their local time */
+  @Cron('0 * * * *')
+  async hourlyDispatch() {
+    this.logger.log('Hourly notification dispatch running');
 
     const members = await this.prisma.workspaceMember.findMany({
       include: { user: true, workspace: true },
@@ -32,157 +46,139 @@ export class NotificationsScheduler {
       const settings = await this.notifications.getSettings(member.userId);
       if (!settings.inApp && !settings.email && !settings.push) continue;
 
-      const terminalIds = await this.taskStatuses.terminalStatusIds(member.workspaceId);
-      const notDone =
-        terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
+      const localHour = getLocalHour(member.user.timezone);
+      const agendaHour = parseHour(settings.dailyAgendaTime ?? '08:00');
 
-      const dueTodayCount = await this.prisma.task.count({
-        where: {
-          workspaceId: member.workspaceId,
-          dueDate: { gte: today, lt: tomorrow },
-          ...notDone,
-          deletedAt: null,
-        },
-      });
-
-      const overdueCount = await this.prisma.task.count({
-        where: {
-          workspaceId: member.workspaceId,
-          dueDate: { lt: today },
-          ...notDone,
-          deletedAt: null,
-        },
-      });
-
-      if (dueTodayCount === 0 && overdueCount === 0) continue;
-
-      const parts: string[] = [];
-      if (dueTodayCount > 0) parts.push(`${dueTodayCount} task${dueTodayCount > 1 ? 's' : ''} due today`);
-      if (overdueCount > 0) parts.push(`${overdueCount} overdue task${overdueCount > 1 ? 's' : ''}`);
-
-      await this.notifications.createAndDeliver({
-        userId: member.userId,
-        workspaceId: member.workspaceId,
-        type: 'daily_agenda',
-        title: 'Daily Agenda',
-        body: parts.join(' · '),
-        userEmail: member.user.email,
-      });
-    }
-  }
-
-  /** Overdue check — every day at 09:00 UTC */
-  @Cron('0 9 * * *')
-  async overdueCheck() {
-    this.logger.log('Running overdue task notifications');
-
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-
-    const members = await this.prisma.workspaceMember.findMany({
-      include: { user: true },
-    });
-
-    for (const member of members) {
-      const settings = await this.notifications.getSettings(member.userId);
-      if (!settings.inApp && !settings.email && !settings.push) continue;
-
-      const terminalIds = await this.taskStatuses.terminalStatusIds(member.workspaceId);
-      const notDone =
-        terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
-
-      const overdueTasks = await this.prisma.task.findMany({
-        where: {
-          workspaceId: member.workspaceId,
-          dueDate: { lt: today },
-          ...notDone,
-          deletedAt: null,
-        },
-        take: 5,
-        orderBy: { dueDate: 'asc' },
-      });
-
-      for (const task of overdueTasks) {
-        // Avoid duplicate notifications: skip if one was sent for this task today
-        const existingToday = await this.prisma.notification.findFirst({
-          where: {
-            userId: member.userId,
-            taskId: task.id,
-            type: 'overdue',
-            createdAt: { gte: today },
-          },
-        });
-        if (existingToday) continue;
-
-        await this.notifications.createAndDeliver({
-          userId: member.userId,
-          workspaceId: member.workspaceId,
-          taskId: task.id,
-          type: 'overdue',
-          title: 'Overdue Task',
-          body: `"${task.title}" is past its due date`,
-          userEmail: member.user.email,
-        });
+      if (localHour === agendaHour) {
+        await this.runDailyAgenda(member, settings);
+      }
+      if (localHour === 9) {
+        await this.runOverdueCheck(member);
+      }
+      if (localHour === 14) {
+        await this.runDueTodayReminder(member);
       }
     }
   }
 
-  /** Due-today reminder — every day at 14:00 UTC (afternoon nudge) */
-  @Cron('0 14 * * *')
-  async dueTodayReminder() {
-    this.logger.log('Running due-today reminder notifications');
-
+  private async runDailyAgenda(
+    member: { userId: string; workspaceId: string; user: { email: string; timezone: string | null } },
+    settings: { inApp: boolean; email: boolean; push: boolean },
+  ) {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
-    const members = await this.prisma.workspaceMember.findMany({
-      include: { user: true },
+    // Dedup: skip if daily_agenda already sent today for this user/workspace
+    const existing = await this.prisma.notification.findFirst({
+      where: {
+        userId: member.userId,
+        workspaceId: member.workspaceId,
+        type: 'daily_agenda',
+        createdAt: { gte: today },
+      },
+    });
+    if (existing) return;
+
+    const terminalIds = await this.taskStatuses.terminalStatusIds(member.workspaceId);
+    const notDone = terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
+
+    const [dueTodayCount, overdueCount] = await Promise.all([
+      this.prisma.task.count({
+        where: { workspaceId: member.workspaceId, dueDate: { gte: today, lt: tomorrow }, ...notDone, deletedAt: null },
+      }),
+      this.prisma.task.count({
+        where: { workspaceId: member.workspaceId, dueDate: { lt: today }, ...notDone, deletedAt: null },
+      }),
+    ]);
+
+    if (dueTodayCount === 0 && overdueCount === 0) return;
+
+    const parts: string[] = [];
+    if (dueTodayCount > 0) parts.push(`${dueTodayCount} task${dueTodayCount > 1 ? 's' : ''} due today`);
+    if (overdueCount > 0) parts.push(`${overdueCount} overdue`);
+
+    await this.notifications.createAndDeliver({
+      userId: member.userId,
+      workspaceId: member.workspaceId,
+      type: 'daily_agenda',
+      title: 'Daily Agenda',
+      body: parts.join(' · '),
+      userEmail: member.user.email,
+      userTimezone: member.user.timezone,
+    });
+  }
+
+  private async runOverdueCheck(
+    member: { userId: string; workspaceId: string; user: { email: string; timezone: string | null } },
+  ) {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    const terminalIds = await this.taskStatuses.terminalStatusIds(member.workspaceId);
+    const notDone = terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
+
+    const overdueTasks = await this.prisma.task.findMany({
+      where: { workspaceId: member.workspaceId, dueDate: { lt: today }, ...notDone, deletedAt: null },
+      take: 5,
+      orderBy: { dueDate: 'asc' },
     });
 
-    for (const member of members) {
-      const settings = await this.notifications.getSettings(member.userId);
-      if (!settings.inApp && !settings.email && !settings.push) continue;
-
-      const terminalIds = await this.taskStatuses.terminalStatusIds(member.workspaceId);
-      const notDone =
-        terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
-
-      const dueTasks = await this.prisma.task.findMany({
-        where: {
-          workspaceId: member.workspaceId,
-          dueDate: { gte: today, lt: tomorrow },
-          ...notDone,
-          deletedAt: null,
-        },
-        take: 5,
-        orderBy: { priority: 'desc' },
+    for (const task of overdueTasks) {
+      const existingToday = await this.prisma.notification.findFirst({
+        where: { userId: member.userId, taskId: task.id, type: 'overdue', createdAt: { gte: today } },
       });
+      if (existingToday) continue;
 
-      if (dueTasks.length === 0) continue;
+      await this.notifications.createAndDeliver({
+        userId: member.userId,
+        workspaceId: member.workspaceId,
+        taskId: task.id,
+        type: 'overdue',
+        title: 'Overdue Task',
+        body: `"${task.title}" is past its due date`,
+        userEmail: member.user.email,
+        userTimezone: member.user.timezone,
+        url: `/tasks`,
+      });
+    }
+  }
 
-      for (const task of dueTasks) {
-        const existingToday = await this.prisma.notification.findFirst({
-          where: {
-            userId: member.userId,
-            taskId: task.id,
-            type: 'due_today',
-            createdAt: { gte: today },
-          },
-        });
-        if (existingToday) continue;
+  private async runDueTodayReminder(
+    member: { userId: string; workspaceId: string; user: { email: string; timezone: string | null } },
+  ) {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
-        await this.notifications.createAndDeliver({
-          userId: member.userId,
-          workspaceId: member.workspaceId,
-          taskId: task.id,
-          type: 'due_today',
-          title: 'Due Today',
-          body: `"${task.title}" is due today`,
-          userEmail: member.user.email,
-        });
-      }
+    const terminalIds = await this.taskStatuses.terminalStatusIds(member.workspaceId);
+    const notDone = terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
+
+    const dueTasks = await this.prisma.task.findMany({
+      where: { workspaceId: member.workspaceId, dueDate: { gte: today, lt: tomorrow }, ...notDone, deletedAt: null },
+      take: 5,
+      orderBy: { priority: 'desc' },
+    });
+
+    for (const task of dueTasks) {
+      const existingToday = await this.prisma.notification.findFirst({
+        where: { userId: member.userId, taskId: task.id, type: 'due_today', createdAt: { gte: today } },
+      });
+      if (existingToday) continue;
+
+      await this.notifications.createAndDeliver({
+        userId: member.userId,
+        workspaceId: member.workspaceId,
+        taskId: task.id,
+        type: 'due_today',
+        title: 'Due Today',
+        body: `"${task.title}" is due today`,
+        userEmail: member.user.email,
+        userTimezone: member.user.timezone,
+        url: `/tasks`,
+      });
     }
   }
 }

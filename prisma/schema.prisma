@@ -207,6 +207,8 @@ model NotificationSettings {
   email            Boolean @default(false)
   push             Boolean @default(false)
   dailyAgendaTime  String  @default("08:00") @map("daily_agenda_time")
+  quietHoursStart  String? @map("quiet_hours_start")
+  quietHoursEnd    String? @map("quiet_hours_end")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
