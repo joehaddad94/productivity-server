@@ -9,10 +9,14 @@ export interface RequestUser {
   email: string;
   name: string | null;
   sessionId: string;
+  isAdmin: boolean;
 }
 
 export const CurrentUser = createParamDecorator(
-  (data: keyof RequestUser | undefined, ctx: ExecutionContext): RequestUser | string | null => {
+  (
+    data: keyof RequestUser | undefined,
+    ctx: ExecutionContext,
+  ): RequestUser | string | boolean | null => {
     const request = ctx.switchToHttp().getRequest<{ user?: RequestUser }>();
     const user = request.user;
     if (!user) return null;

@@ -17,6 +17,7 @@ model User {
   name       String?
   avatarUrl  String?   @map("avatar_url")
   timezone   String?
+  isAdmin    Boolean  @default(false) @map("is_admin")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   sessions              Session[]
@@ -27,6 +28,7 @@ model User {
   notificationSettings  NotificationSettings?
   pushSubscriptions     PushSubscription[]
   calendarConnections   CalendarConnection[]
+  bugReports            BugReport[]
 
   @@map("users")
 }
@@ -68,8 +70,36 @@ model Workspace {
   dailyStats         DailyStat[]
   notifications      Notification[]
   workspaceTaskStatuses WorkspaceTaskStatus[]
+  bugReports         BugReport[]
 
   @@map("workspaces")
+}
+
+model BugReport {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  workspaceId    String?   @map("workspace_id")
+  title          String
+  description    String    @db.Text
+  expected       String?   @db.Text
+  actual         String?   @db.Text
+  route          String?
+  userAgent      String?   @map("user_agent") @db.Text
+  contextJson    Json?     @map("context_json")
+  status         String    @default("open")
+  priority       String?
+  resolvedAt     DateTime? @map("resolved_at")
+  resolutionNote String?   @map("resolution_note") @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([workspaceId])
+  @@map("bug_reports")
 }
 
 model WorkspaceMember {

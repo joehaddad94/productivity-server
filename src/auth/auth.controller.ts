@@ -124,7 +124,14 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Current user' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   me(@CurrentUser() user: RequestUser) {
-    return { user };
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        isAdmin: user.isAdmin,
+      },
+    };
   }
 
   @Patch('me')
@@ -138,7 +145,14 @@ export class AuthController {
     @Body() body: { name?: string },
   ) {
     const updated = await this.usersService.updateProfile(user.id, { name: body.name });
-    return { user: { id: updated.id, email: updated.email, name: updated.name } };
+    return {
+      user: {
+        id: updated.id,
+        email: updated.email,
+        name: updated.name,
+        isAdmin: updated.isAdmin,
+      },
+    };
   }
 
   /**
