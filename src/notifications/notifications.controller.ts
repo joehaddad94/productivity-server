@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Req, UseGuards,
+  Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -18,8 +18,15 @@ export class NotificationsController {
   list(
     @CurrentUser() user: AuthenticatedUser,
     @Param('workspaceId') workspaceId: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
   ) {
-    return this.service.list(user.id, workspaceId);
+    return this.service.list(
+      user.id,
+      workspaceId,
+      skip ? parseInt(skip, 10) : 0,
+      take ? parseInt(take, 10) : 50,
+    );
   }
 
   @Get('unread-count')
@@ -107,5 +114,22 @@ export class NotificationsMeController {
     @Body('endpoint') endpoint: string,
   ) {
     return this.service.deletePushSubscription(user.id, endpoint);
+  }
+
+  @Post('test')
+  @HttpCode(200)
+  async sendTestNotification(
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.service.createAndDeliver({
+      userId: user.id,
+      workspaceId: '',
+      type: 'daily_agenda',
+      title: 'Test Notification',
+      body: 'Push notifications are working correctly.',
+      userEmail: user.email,
+      skipInApp: true,
+    });
+    return { ok: true };
   }
 }

@@ -55,7 +55,7 @@ export class MailService {
             <h2 style="color:#047857;margin-bottom:8px">${title}</h2>
             <p style="color:#374151;font-size:15px">${body}</p>
             <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
-            <p style="color:#9ca3af;font-size:12px">You're receiving this because you have email notifications enabled in Tasky. <a href="#" style="color:#047857">Manage preferences</a></p>
+            <p style="color:#9ca3af;font-size:12px">You're receiving this because you have email notifications enabled in Tasky. <a href="${this.config.get('FRONTEND_URL') ?? 'http://localhost:3000'}/settings?tab=notifications" style="color:#047857">Manage preferences</a></p>
           </div>
         `.trim(),
       });

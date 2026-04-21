@@ -15,6 +15,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CalendarConnectionsModule } from './calendar-connections/calendar-connections.module';
+import { BugReportsModule } from './bug-reports/bug-reports.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { CalendarConnectionsModule } from './calendar-connections/calendar-conne
     AnalyticsModule,
     NotificationsModule,
     CalendarConnectionsModule,
+    BugReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

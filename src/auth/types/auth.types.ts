@@ -1,6 +1,6 @@
 /** Internal: service returns this; controller sets cookie and returns only user. */
 export interface AuthResult {
-  user: { id: string; email: string; name: string | null };
+  user: { id: string; email: string; name: string | null; isAdmin: boolean };
   accessToken: string;
 }
 

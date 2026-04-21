@@ -91,7 +91,7 @@ export class ProjectsService {
         ...(dto.color !== undefined ? { color: dto.color } : {}),
       },
       include: { _count: { select: { notes: true, tasks: true } } },
-    }) as ProjectWithCount;
+    }) as unknown as ProjectWithCount;
   }
 
   async remove(workspaceId: string, id: string, userId: string): Promise<void> {

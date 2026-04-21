@@ -17,6 +17,7 @@ model User {
   name       String?
   avatarUrl  String?   @map("avatar_url")
   timezone   String?
+  isAdmin    Boolean  @default(false) @map("is_admin")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   sessions              Session[]
@@ -27,6 +28,7 @@ model User {
   notificationSettings  NotificationSettings?
   pushSubscriptions     PushSubscription[]
   calendarConnections   CalendarConnection[]
+  bugReports            BugReport[]
 
   @@map("users")
 }
@@ -61,14 +63,43 @@ model Workspace {
   isPersonal Boolean  @default(false) @map("is_personal")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  members       WorkspaceMember[]
-  projects      Project[]
-  tasks         Task[]
-  notes         Note[]
-  dailyStats    DailyStat[]
-  notifications Notification[]
+  members            WorkspaceMember[]
+  projects           Project[]
+  tasks              Task[]
+  notes              Note[]
+  dailyStats         DailyStat[]
+  notifications      Notification[]
+  workspaceTaskStatuses WorkspaceTaskStatus[]
+  bugReports         BugReport[]
 
   @@map("workspaces")
+}
+
+model BugReport {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  workspaceId    String?   @map("workspace_id")
+  title          String
+  description    String    @db.Text
+  expected       String?   @db.Text
+  actual         String?   @db.Text
+  route          String?
+  userAgent      String?   @map("user_agent") @db.Text
+  contextJson    Json?     @map("context_json")
+  status         String    @default("open")
+  priority       String?
+  resolvedAt     DateTime? @map("resolved_at")
+  resolutionNote String?   @map("resolution_note") @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([workspaceId])
+  @@map("bug_reports")
 }
 
 model WorkspaceMember {
@@ -82,6 +113,25 @@ model WorkspaceMember {
 
   @@unique([userId, workspaceId])
   @@map("workspace_members")
+}
+
+/// Per-workflow columns for tasks. `key` is set for the three built-in rows (pending / in_progress / completed); custom statuses use key = null.
+model WorkspaceTaskStatus {
+  id          String    @id @default(uuid())
+  workspaceId String    @map("workspace_id")
+  key         String?   @map("key")
+  name        String
+  sortOrder   Int       @map("sort_order")
+  isTerminal  Boolean   @default(false) @map("is_terminal")
+  color       String?
+  archivedAt  DateTime? @map("archived_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, sortOrder])
+  @@map("workspace_task_statuses")
 }
 
 // --- Projects & tasks ---
@@ -187,6 +237,8 @@ model NotificationSettings {
   email            Boolean @default(false)
   push             Boolean @default(false)
   dailyAgendaTime  String  @default("08:00") @map("daily_agenda_time")
+  quietHoursStart  String? @map("quiet_hours_start")
+  quietHoursEnd    String? @map("quiet_hours_end")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

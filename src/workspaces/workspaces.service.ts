@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { TaskStatusesService } from '../task-statuses/task-statuses.service';
 import { ConfigService } from '@nestjs/config';
 import { Workspace, WorkspaceMember } from '@prisma/client';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
@@ -23,6 +24,7 @@ export class WorkspacesService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly config: ConfigService,
+    private readonly taskStatuses: TaskStatusesService,
   ) {}
 
   /** Generate URL-safe slug from name */
@@ -79,6 +81,8 @@ export class WorkspacesService {
         role: 'owner',
       },
     });
+
+    await this.taskStatuses.seedDefaultsForWorkspace(workspace.id);
 
     return workspace;
   }

@@ -109,7 +109,10 @@ export class AuthService {
       email: user.email,
       jti: session.id,
     });
-    return { user: { id: user.id, email: user.email, name: user.name }, accessToken };
+    return {
+      user: { id: user.id, email: user.email, name: user.name, isAdmin: user.isAdmin },
+      accessToken,
+    };
   }
 
   async verifyMagicLink(token: string): Promise<AuthResult> {
@@ -128,7 +131,7 @@ export class AuthService {
     });
 
     return {
-      user: { id: user.id, email: user.email, name: user.name },
+      user: { id: user.id, email: user.email, name: user.name, isAdmin: user.isAdmin },
       accessToken,
     };
   }
