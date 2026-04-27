@@ -178,9 +178,22 @@ export class TasksService {
     });
 
     if (isCompleting) {
-      await this.analytics.logStat(workspaceId, userId, { tasksCompleted: 1 });
-      await this.spawnNextRecurrence(existing, workspaceId);
-      await this.notifyOtherMembers(workspaceId, userId, updated.title);
+      // Cascade completion to all non-terminal subtasks in parallel
+      await this.prisma.task.updateMany({
+        where: {
+          parentTaskId: id,
+          workspaceId,
+          deletedAt: null,
+          NOT: { status: dto.status! },
+        },
+        data: { status: dto.status!, completedAt: new Date() },
+      });
+
+      await Promise.all([
+        this.analytics.logStat(workspaceId, userId, { tasksCompleted: 1 }),
+        this.spawnNextRecurrence(existing, workspaceId),
+        this.notifyOtherMembers(workspaceId, userId, updated.title),
+      ]);
     }
 
     return updated;
