@@ -273,6 +273,35 @@ export class TaskStatusesService {
     await this.prisma.workspaceTaskStatus.delete({ where: { id: statusId } });
   }
 
+  /** Atomically swap the sortOrder of two statuses in one transaction. */
+  async swap(
+    workspaceId: string,
+    userId: string,
+    idA: string,
+    idB: string,
+  ): Promise<{ statuses: TaskStatusApi[] }> {
+    await this.assertMember(workspaceId, userId);
+
+    const [a, b] = await Promise.all([
+      this.prisma.workspaceTaskStatus.findFirst({ where: { id: idA, workspaceId } }),
+      this.prisma.workspaceTaskStatus.findFirst({ where: { id: idB, workspaceId } }),
+    ]);
+    if (!a || !b) throw new NotFoundException('One or both statuses not found');
+
+    const [updatedA, updatedB] = await this.prisma.$transaction([
+      this.prisma.workspaceTaskStatus.update({
+        where: { id: idA },
+        data: { sortOrder: b.sortOrder },
+      }),
+      this.prisma.workspaceTaskStatus.update({
+        where: { id: idB },
+        data: { sortOrder: a.sortOrder },
+      }),
+    ]);
+
+    return { statuses: [this.toApi(updatedA), this.toApi(updatedB)] };
+  }
+
   /** Status ids that count as “done” for notifications and filters. */
   async terminalStatusIds(workspaceId: string): Promise<string[]> {
     await this.seedDefaultsForWorkspace(workspaceId);
