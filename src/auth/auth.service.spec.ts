@@ -28,6 +28,7 @@ describe('AuthService', () => {
     name: 'Jane',
     avatarUrl: null,
     timezone: null,
+    isAdmin: false,
     updatedAt: new Date(),
   };
 

@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TaskStatusesService } from './task-statuses.service';
 import { CreateTaskStatusDto } from './dto/create-task-status.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
+import { SwapTaskStatusesDto } from './dto/swap-task-statuses.dto';
 
 @ApiTags('task-statuses')
 @Controller('workspaces/:workspaceId/task-statuses')
@@ -43,6 +44,17 @@ export class TaskStatusesController {
     @Body() dto: CreateTaskStatusDto,
   ) {
     return this.taskStatusesService.create(workspaceId, user.id, dto);
+  }
+
+  @Post('swap')
+  @ApiOperation({ summary: 'Atomically swap the sortOrder of two statuses' })
+  @ApiResponse({ status: 200, description: '{ statuses: [statusA, statusB] }' })
+  async swap(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @CurrentUser() user: RequestUser,
+    @Body() dto: SwapTaskStatusesDto,
+  ) {
+    return this.taskStatusesService.swap(workspaceId, user.id, dto.idA, dto.idB);
   }
 
   @Patch(':statusId')

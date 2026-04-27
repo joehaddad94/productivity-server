@@ -54,6 +54,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       name: user.name,
       sessionId: payload.jti,
       isAdmin: user.isAdmin,
+      timezone: user.timezone ?? null,
     };
   }
 }

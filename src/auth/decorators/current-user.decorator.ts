@@ -10,6 +10,7 @@ export interface RequestUser {
   name: string | null;
   sessionId: string;
   isAdmin: boolean;
+  timezone: string | null;
 }
 
 export const CurrentUser = createParamDecorator(

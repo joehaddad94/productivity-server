@@ -23,6 +23,25 @@ function parseHour(hhmm: string): number {
   return parseInt(hhmm.split(':')[0] ?? '8', 10);
 }
 
+/** Returns UTC-midnight Date objects that represent today/tomorrow in the user's local timezone. */
+function getLocalDayBoundaries(timezone: string | null | undefined): { today: Date; tomorrow: Date } {
+  const tz = timezone ?? 'UTC';
+  try {
+    // 'en-CA' locale uses YYYY-MM-DD format which is easy to parse
+    const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const today = new Date(dateStr + 'T00:00:00Z');
+    const tomorrow = new Date(today);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    return { today, tomorrow };
+  } catch {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    return { today, tomorrow };
+  }
+}
+
 @Injectable()
 export class NotificationsScheduler {
   private readonly logger = new Logger(NotificationsScheduler.name);
@@ -65,10 +84,7 @@ export class NotificationsScheduler {
     member: { userId: string; workspaceId: string; user: { email: string; timezone: string | null } },
     settings: { inApp: boolean; email: boolean; push: boolean },
   ) {
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    const { today, tomorrow } = getLocalDayBoundaries(member.user.timezone);
 
     // Dedup: skip if daily_agenda already sent today for this user/workspace
     const existing = await this.prisma.notification.findFirst({
@@ -113,8 +129,7 @@ export class NotificationsScheduler {
   private async runOverdueCheck(
     member: { userId: string; workspaceId: string; user: { email: string; timezone: string | null } },
   ) {
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
+    const { today } = getLocalDayBoundaries(member.user.timezone);
 
     const terminalIds = await this.taskStatuses.terminalStatusIds(member.workspaceId);
     const notDone = terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
@@ -148,10 +163,7 @@ export class NotificationsScheduler {
   private async runDueTodayReminder(
     member: { userId: string; workspaceId: string; user: { email: string; timezone: string | null } },
   ) {
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    const { today, tomorrow } = getLocalDayBoundaries(member.user.timezone);
 
     const terminalIds = await this.taskStatuses.terminalStatusIds(member.workspaceId);
     const notDone = terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};

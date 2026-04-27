@@ -130,6 +130,7 @@ export class AuthController {
         email: user.email,
         name: user.name,
         isAdmin: user.isAdmin,
+        timezone: user.timezone,
       },
     };
   }
@@ -137,20 +138,21 @@ export class AuthController {
   @Patch('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update current user profile (name)' })
+  @ApiOperation({ summary: 'Update current user profile (name, timezone)' })
   @ApiResponse({ status: 200, description: 'Updated user' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async updateMe(
     @CurrentUser() user: RequestUser,
-    @Body() body: { name?: string },
+    @Body() body: { name?: string; timezone?: string },
   ) {
-    const updated = await this.usersService.updateProfile(user.id, { name: body.name });
+    const updated = await this.usersService.updateProfile(user.id, { name: body.name, timezone: body.timezone });
     return {
       user: {
         id: updated.id,
         email: updated.email,
         name: updated.name,
         isAdmin: updated.isAdmin,
+        timezone: updated.timezone ?? null,
       },
     };
   }
