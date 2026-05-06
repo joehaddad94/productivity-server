@@ -58,6 +58,7 @@ export class NotificationsScheduler {
     this.logger.log('Hourly notification dispatch running');
 
     const members = await this.prisma.workspaceMember.findMany({
+      where: { workspace: { deletedAt: null } },
       include: { user: true, workspace: true },
     });
 

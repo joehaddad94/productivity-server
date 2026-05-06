@@ -96,12 +96,16 @@ export class NotificationsService {
   // ── Notification CRUD ─────────────────────────────────────────────────────
 
   async list(userId: string, workspaceId: string, skip = 0, take = 50) {
-    return this.prisma.notification.findMany({
-      where: { userId, workspaceId },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take,
-    });
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.notification.findMany({
+        where: { userId, workspaceId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.notification.count({ where: { userId, workspaceId } }),
+    ]);
+    return { items, total };
   }
 
   async unreadCount(userId: string, workspaceId: string): Promise<number> {

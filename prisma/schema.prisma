@@ -57,11 +57,12 @@ model Session {
 
 // --- Workspaces ---
 model Workspace {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   name       String
-  slug       String   @unique
-  isPersonal Boolean  @default(false) @map("is_personal")
-  createdAt  DateTime @default(now()) @map("created_at")
+  slug       String    @unique
+  isPersonal Boolean   @default(false) @map("is_personal")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  deletedAt  DateTime? @map("deleted_at")
 
   members            WorkspaceMember[]
   projects           Project[]
@@ -136,13 +137,14 @@ model WorkspaceTaskStatus {
 
 // --- Projects & tasks ---
 model Project {
-  id          String   @id @default(uuid())
-  workspaceId String   @map("workspace_id")
+  id          String    @id @default(uuid())
+  workspaceId String    @map("workspace_id")
   name        String
   description String?
-  status      String   @default("active")
+  status      String    @default("active")
   color       String?
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  deletedAt   DateTime? @map("deleted_at")
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   notes     Note[]
