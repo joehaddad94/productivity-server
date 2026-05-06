@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Patch,
   Post,
@@ -155,6 +156,17 @@ export class AuthController {
         timezone: updated.timezone ?? null,
       },
     };
+  }
+
+  @Delete('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Permanently delete the current user account and all data' })
+  @ApiResponse({ status: 200, description: 'Account deleted' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async deleteMe(@CurrentUser() user: RequestUser) {
+    await this.usersService.deleteAccount(user.id);
+    return { message: 'Account deleted' };
   }
 
   /**
