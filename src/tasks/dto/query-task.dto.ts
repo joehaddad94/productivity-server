@@ -30,11 +30,11 @@ export class QueryTaskDto {
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ description: 'Max number of records to return (default 50)', default: 50 })
+  @ApiPropertyOptional({ description: 'Max number of records to return (default 50, max 500)', default: 50 })
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(200)
+  @Max(500)
   @Type(() => Number)
   limit?: number;
 
