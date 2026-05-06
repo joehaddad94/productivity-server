@@ -33,7 +33,7 @@ export class ProjectsService {
 
     const limit = query.limit ?? 50;
     const skip = query.skip ?? 0;
-    const where = { workspaceId };
+    const where = { workspaceId, deletedAt: null };
 
     const [projects, total] = await this.prisma.$transaction([
       this.prisma.project.findMany({
@@ -67,7 +67,7 @@ export class ProjectsService {
     await this.assertMember(workspaceId, userId);
 
     const project = await this.prisma.project.findFirst({
-      where: { id, workspaceId },
+      where: { id, workspaceId, deletedAt: null },
       include: { _count: { select: { notes: true, tasks: true } } },
     });
     if (!project) throw new NotFoundException('Project not found');
@@ -96,6 +96,9 @@ export class ProjectsService {
 
   async remove(workspaceId: string, id: string, userId: string): Promise<void> {
     await this.findOne(workspaceId, id, userId);
-    await this.prisma.project.delete({ where: { id } });
+    await this.prisma.project.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
   }
 }
