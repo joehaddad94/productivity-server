@@ -15,7 +15,6 @@ import { CalendarConnectionsService, type CalendarEvent } from './calendar-conne
 
 @ApiTags('calendar-connections')
 @Controller('calendar-connections')
-@UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class CalendarConnectionsController {
   constructor(
@@ -24,52 +23,58 @@ export class CalendarConnectionsController {
   ) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'List connected calendars' })
   async list(@CurrentUser() user: RequestUser) {
     return this.service.listConnections(user.id);
   }
 
+  /** Returns the Google OAuth URL as JSON — frontend redirects the browser to it directly. */
   @Get('google/auth')
-  @ApiOperation({ summary: 'Redirect to Google OAuth consent screen' })
-  @Redirect()
-  googleAuth() {
-    const url = this.service.getGoogleAuthUrl();
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get Google OAuth URL' })
+  googleAuth(@CurrentUser() user: RequestUser) {
+    const url = this.service.getGoogleAuthUrl(user.id);
     return { url };
   }
 
+  /** Google redirects here after consent — no session cookie needed, user ID is in signed state. */
   @Get('google/callback')
-  @ApiOperation({ summary: 'Google OAuth callback' })
   @Redirect()
+  @ApiOperation({ summary: 'Google OAuth callback' })
   async googleCallback(
-    @CurrentUser() user: RequestUser,
     @Query('code') code: string,
+    @Query('state') state: string,
   ) {
-    await this.service.handleGoogleCallback(user.id, code);
+    const userId = this.service.verifyOAuthState(state);
+    await this.service.handleGoogleCallback(userId, code);
     const frontendUrl = this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
     return { url: `${frontendUrl}/settings?calendar=connected&provider=google` };
   }
 
   @Get('microsoft/auth')
-  @ApiOperation({ summary: 'Redirect to Microsoft OAuth consent screen' })
-  @Redirect()
-  microsoftAuth() {
-    const url = this.service.getMicrosoftAuthUrl();
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get Microsoft OAuth URL' })
+  microsoftAuth(@CurrentUser() user: RequestUser) {
+    const url = this.service.getMicrosoftAuthUrl(user.id);
     return { url };
   }
 
   @Get('microsoft/callback')
-  @ApiOperation({ summary: 'Microsoft OAuth callback' })
   @Redirect()
+  @ApiOperation({ summary: 'Microsoft OAuth callback' })
   async microsoftCallback(
-    @CurrentUser() user: RequestUser,
     @Query('code') code: string,
+    @Query('state') state: string,
   ) {
-    await this.service.handleMicrosoftCallback(user.id, code);
+    const userId = this.service.verifyOAuthState(state);
+    await this.service.handleMicrosoftCallback(userId, code);
     const frontendUrl = this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
     return { url: `${frontendUrl}/settings?calendar=connected&provider=microsoft` };
   }
 
   @Delete(':provider')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Disconnect a calendar provider' })
   async disconnect(
     @CurrentUser() user: RequestUser,
@@ -80,6 +85,7 @@ export class CalendarConnectionsController {
   }
 
   @Get('events')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Fetch events from all connected calendars' })
   async events(
     @CurrentUser() user: RequestUser,
