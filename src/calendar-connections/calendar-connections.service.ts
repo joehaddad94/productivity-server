@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -37,9 +38,40 @@ export class CalendarConnectionsService {
     private readonly config: ConfigService,
   ) {}
 
+  // ─── State signing (replaces cookie auth on callback) ────────────────────
+
+  private signOAuthState(userId: string): string {
+    const secret = this.config.getOrThrow<string>('JWT_SECRET');
+    const payload = `${userId}:${Date.now()}`;
+    const sig = createHmac('sha256', secret).update(payload).digest('hex');
+    return Buffer.from(`${payload}:${sig}`).toString('base64url');
+  }
+
+  verifyOAuthState(state: string): string {
+    try {
+      const decoded = Buffer.from(state, 'base64url').toString('utf8');
+      const lastColon = decoded.lastIndexOf(':');
+      const payload = decoded.slice(0, lastColon);
+      const sig = decoded.slice(lastColon + 1);
+      const secret = this.config.getOrThrow<string>('JWT_SECRET');
+      const expected = createHmac('sha256', secret).update(payload).digest('hex');
+      if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+        throw new Error('bad sig');
+      }
+      const [userId, tsStr] = payload.split(':');
+      if (Date.now() - parseInt(tsStr, 10) > 10 * 60 * 1000) {
+        throw new BadRequestException('OAuth state expired — please try connecting again');
+      }
+      return userId;
+    } catch (e) {
+      if (e instanceof BadRequestException) throw e;
+      throw new BadRequestException('Invalid OAuth state');
+    }
+  }
+
   // ─── OAuth URLs ───────────────────────────────────────────────────────────
 
-  getGoogleAuthUrl(): string {
+  getGoogleAuthUrl(userId: string): string {
     const clientId = this.config.get<string>('GOOGLE_CALENDAR_CLIENT_ID');
     const redirectUri = this.config.get<string>('GOOGLE_CALENDAR_REDIRECT_URI');
     if (!clientId || !redirectUri) {
@@ -52,11 +84,12 @@ export class CalendarConnectionsService {
       scope: 'https://www.googleapis.com/auth/calendar.readonly',
       access_type: 'offline',
       prompt: 'consent',
+      state: this.signOAuthState(userId),
     });
     return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
   }
 
-  getMicrosoftAuthUrl(): string {
+  getMicrosoftAuthUrl(userId: string): string {
     const clientId = this.config.get<string>('MICROSOFT_CLIENT_ID');
     const redirectUri = this.config.get<string>('MICROSOFT_REDIRECT_URI');
     if (!clientId || !redirectUri) {
@@ -68,6 +101,7 @@ export class CalendarConnectionsService {
       response_type: 'code',
       scope: 'Calendars.Read offline_access',
       response_mode: 'query',
+      state: this.signOAuthState(userId),
     });
     return `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params}`;
   }
