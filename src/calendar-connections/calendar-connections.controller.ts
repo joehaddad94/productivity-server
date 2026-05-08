@@ -45,7 +45,7 @@ export class CalendarConnectionsController {
     @Query('code') code: string,
   ) {
     await this.service.handleGoogleCallback(user.id, code);
-    const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
+    const frontendUrl = this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
     return { url: `${frontendUrl}/settings?calendar=connected&provider=google` };
   }
 
@@ -65,7 +65,7 @@ export class CalendarConnectionsController {
     @Query('code') code: string,
   ) {
     await this.service.handleMicrosoftCallback(user.id, code);
-    const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
+    const frontendUrl = this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
     return { url: `${frontendUrl}/settings?calendar=connected&provider=microsoft` };
   }
 
