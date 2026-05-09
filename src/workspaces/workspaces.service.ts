@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { membershipCache, membershipKey } from '../common/membership-cache';
 import { MailService } from '../mail/mail.service';
 import { TaskStatusesService } from '../task-statuses/task-statuses.service';
 import { ConfigService } from '@nestjs/config';
@@ -15,7 +16,12 @@ import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateMemberDto } from './dto/update-member.dto';
 
 type MemberWithUser = WorkspaceMember & {
-  user: { id: string; email: string; name: string | null; avatarUrl: string | null };
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+    avatarUrl: string | null;
+  };
 };
 
 @Injectable()
@@ -37,7 +43,10 @@ export class WorkspacesService {
   }
 
   /** Ensure slug is unique among non-deleted workspaces; if taken, append short id */
-  private async ensureUniqueSlug(slug: string, excludeId?: string): Promise<string> {
+  private async ensureUniqueSlug(
+    slug: string,
+    excludeId?: string,
+  ): Promise<string> {
     const existing = await this.prisma.workspace.findFirst({
       where: {
         slug,
@@ -51,8 +60,7 @@ export class WorkspacesService {
   }
 
   async create(dto: CreateWorkspaceDto, userId: string): Promise<Workspace> {
-    const slug =
-      dto.slug?.trim() || this.slugify(dto.name) || 'workspace';
+    const slug = dto.slug?.trim() || this.slugify(dto.name) || 'workspace';
 
     const memberships = await this.prisma.workspaceMember.findMany({
       where: { userId },
@@ -142,16 +150,26 @@ export class WorkspacesService {
 
   // --- Member management ---
 
-  async listMembers(workspaceId: string, requesterId: string): Promise<MemberWithUser[]> {
+  async listMembers(
+    workspaceId: string,
+    requesterId: string,
+  ): Promise<MemberWithUser[]> {
     const requesterMembership = await this.prisma.workspaceMember.findFirst({
-      where: { userId: requesterId, workspaceId, workspace: { deletedAt: null } },
+      where: {
+        userId: requesterId,
+        workspaceId,
+        workspace: { deletedAt: null },
+      },
     });
-    if (!requesterMembership) throw new ForbiddenException("You don't have access to this workspace");
+    if (!requesterMembership)
+      throw new ForbiddenException("You don't have access to this workspace");
 
     return this.prisma.workspaceMember.findMany({
       where: { workspaceId },
       include: {
-        user: { select: { id: true, email: true, name: true, avatarUrl: true } },
+        user: {
+          select: { id: true, email: true, name: true, avatarUrl: true },
+        },
       },
     }) as Promise<MemberWithUser[]>;
   }
@@ -162,11 +180,18 @@ export class WorkspacesService {
     dto: InviteMemberDto,
   ): Promise<{ invited: boolean; message: string }> {
     const requesterMembership = await this.prisma.workspaceMember.findFirst({
-      where: { userId: requesterId, workspaceId, workspace: { deletedAt: null } },
+      where: {
+        userId: requesterId,
+        workspaceId,
+        workspace: { deletedAt: null },
+      },
     });
-    if (!requesterMembership) throw new ForbiddenException("You don't have access to this workspace");
+    if (!requesterMembership)
+      throw new ForbiddenException("You don't have access to this workspace");
 
-    const workspace = await this.prisma.workspace.findFirst({ where: { id: workspaceId, deletedAt: null } });
+    const workspace = await this.prisma.workspace.findFirst({
+      where: { id: workspaceId, deletedAt: null },
+    });
     if (!workspace) throw new NotFoundException('Workspace not found');
 
     const existingUser = await this.prisma.user.findUnique({
@@ -181,7 +206,10 @@ export class WorkspacesService {
         },
       });
       if (existing) {
-        return { invited: false, message: 'User is already a member of this workspace' };
+        return {
+          invited: false,
+          message: 'User is already a member of this workspace',
+        };
       }
 
       await this.prisma.workspaceMember.create({
@@ -189,7 +217,9 @@ export class WorkspacesService {
       });
 
       // Send notification email
-      const appUrl = this.config.get<string>('NEXT_PUBLIC_APP_URL') ?? 'https://app.tasky.io';
+      const appUrl =
+        this.config.get<string>('NEXT_PUBLIC_APP_URL') ??
+        'https://app.tasky.io';
       await this.mail.sendInviteEmail(
         dto.email,
         workspace.name,
@@ -201,10 +231,16 @@ export class WorkspacesService {
     }
 
     // User doesn't exist: send invite link
-    const appUrl = this.config.get<string>('NEXT_PUBLIC_APP_URL') ?? 'https://app.tasky.io';
+    const appUrl =
+      this.config.get<string>('NEXT_PUBLIC_APP_URL') ?? 'https://app.tasky.io';
     const inviteLink = `${appUrl}/signup?email=${encodeURIComponent(dto.email)}&workspace=${workspaceId}`;
 
-    await this.mail.sendInviteEmail(dto.email, workspace.name, inviteLink, dto.email);
+    await this.mail.sendInviteEmail(
+      dto.email,
+      workspace.name,
+      inviteLink,
+      dto.email,
+    );
 
     return { invited: true, message: 'Invite email sent' };
   }
@@ -215,11 +251,18 @@ export class WorkspacesService {
     targetUserId: string,
   ): Promise<void> {
     const requesterMembership = await this.prisma.workspaceMember.findFirst({
-      where: { userId: requesterId, workspaceId, workspace: { deletedAt: null } },
+      where: {
+        userId: requesterId,
+        workspaceId,
+        workspace: { deletedAt: null },
+      },
     });
-    if (!requesterMembership) throw new ForbiddenException("You don't have access to this workspace");
+    if (!requesterMembership)
+      throw new ForbiddenException("You don't have access to this workspace");
     if (requesterMembership.role !== 'owner') {
-      throw new ForbiddenException('Only the workspace owner can remove members');
+      throw new ForbiddenException(
+        'Only the workspace owner can remove members',
+      );
     }
 
     const targetMembership = await this.prisma.workspaceMember.findUnique({
@@ -230,6 +273,7 @@ export class WorkspacesService {
     await this.prisma.workspaceMember.delete({
       where: { userId_workspaceId: { userId: targetUserId, workspaceId } },
     });
+    membershipCache.delete(membershipKey(targetUserId, workspaceId));
   }
 
   async updateMemberRole(
@@ -239,11 +283,18 @@ export class WorkspacesService {
     dto: UpdateMemberDto,
   ): Promise<WorkspaceMember> {
     const requesterMembership = await this.prisma.workspaceMember.findFirst({
-      where: { userId: requesterId, workspaceId, workspace: { deletedAt: null } },
+      where: {
+        userId: requesterId,
+        workspaceId,
+        workspace: { deletedAt: null },
+      },
     });
-    if (!requesterMembership) throw new ForbiddenException("You don't have access to this workspace");
+    if (!requesterMembership)
+      throw new ForbiddenException("You don't have access to this workspace");
     if (requesterMembership.role !== 'owner') {
-      throw new ForbiddenException('Only the workspace owner can update member roles');
+      throw new ForbiddenException(
+        'Only the workspace owner can update member roles',
+      );
     }
 
     const targetMembership = await this.prisma.workspaceMember.findUnique({

@@ -33,7 +33,8 @@ export class MagicLinkService {
         expiresAt,
       } as Prisma.VerificationTokenCreateInput,
     });
-    const baseUrl = this.config.get('APP_URL') ?? 'http://localhost:5173';
+    const baseUrl =
+      this.config.get<string>('APP_URL') ?? 'http://localhost:5173';
     const magicLink = `${baseUrl}/verify?token=${token}`;
     return { magicLink };
   }
@@ -50,7 +51,9 @@ export class MagicLinkService {
       throw new BadRequestException('Invalid or expired link');
     }
     if (record.expiresAt < new Date()) {
-      await this.prisma.verificationToken.delete({ where: { id: record.id } }).catch(() => {});
+      await this.prisma.verificationToken
+        .delete({ where: { id: record.id } })
+        .catch(() => {});
       throw new BadRequestException('Link has expired');
     }
     const tokenRecord = record as { email: string; name?: string | null };

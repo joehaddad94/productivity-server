@@ -9,9 +9,17 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ParseUUIDPipe } from '@nestjs/common/pipes';
-import { CurrentUser, RequestUser } from '../auth/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  RequestUser,
+} from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TaskStatusesService } from './task-statuses.service';
 import { CreateTaskStatusDto } from './dto/create-task-status.dto';
@@ -54,7 +62,12 @@ export class TaskStatusesController {
     @CurrentUser() user: RequestUser,
     @Body() dto: SwapTaskStatusesDto,
   ) {
-    return this.taskStatusesService.swap(workspaceId, user.id, dto.idA, dto.idB);
+    return this.taskStatusesService.swap(
+      workspaceId,
+      user.id,
+      dto.idA,
+      dto.idB,
+    );
   }
 
   @Patch(':statusId')

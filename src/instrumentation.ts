@@ -21,14 +21,19 @@ if (otelEndpoint) {
   const serviceName = process.env.OTEL_SERVICE_NAME || 'tasky-server';
   process.env.OTEL_SERVICE_NAME = serviceName;
   const namespace = process.env.OTEL_SERVICE_NAMESPACE || 'tasky';
-  const envName = process.env.OTEL_DEPLOYMENT_ENVIRONMENT || process.env.NODE_ENV || 'development';
+  const envName =
+    process.env.OTEL_DEPLOYMENT_ENVIRONMENT ||
+    process.env.NODE_ENV ||
+    'development';
   const existing = process.env.OTEL_RESOURCE_ATTRIBUTES || '';
   const resourceAttrs = [
     `service.name=${serviceName}`,
     `service.namespace=${namespace}`,
     `deployment.environment=${envName}`,
   ].join(',');
-  process.env.OTEL_RESOURCE_ATTRIBUTES = existing ? `${existing},${resourceAttrs}` : resourceAttrs;
+  process.env.OTEL_RESOURCE_ATTRIBUTES = existing
+    ? `${existing},${resourceAttrs}`
+    : resourceAttrs;
   // Avoid cloud metadata lookups (AWS/GCP) that cause "MetadataLookupWarning" locally
   if (!process.env.OTEL_NODE_RESOURCE_DETECTORS) {
     process.env.OTEL_NODE_RESOURCE_DETECTORS = 'env,host,os';
@@ -39,5 +44,8 @@ if (otelEndpoint) {
   });
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('@opentelemetry/auto-instrumentations-node/register');
-  console.log('[OpenTelemetry] Instrumentation registered – traces will appear in Grafana as service:', serviceName);
+  console.log(
+    '[OpenTelemetry] Instrumentation registered – traces will appear in Grafana as service:',
+    serviceName,
+  );
 }

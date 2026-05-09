@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class CreateProjectDto {
   @ApiProperty({ example: 'My Project' })
@@ -14,7 +20,10 @@ export class CreateProjectDto {
   @MaxLength(1000)
   description?: string;
 
-  @ApiPropertyOptional({ enum: ['active', 'on_hold', 'completed'], default: 'active' })
+  @ApiPropertyOptional({
+    enum: ['active', 'on_hold', 'completed'],
+    default: 'active',
+  })
   @IsOptional()
   @IsIn(['active', 'on_hold', 'completed'])
   status?: string;

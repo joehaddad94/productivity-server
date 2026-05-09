@@ -64,7 +64,9 @@ describe('MailService', () => {
         expect.objectContaining({
           to: [{ email: 'recipient@example.com' }],
           subject: 'Your magic link to sign in',
-          htmlContent: expect.stringContaining('https://app.example.com/auth/verify?token=abc'),
+          htmlContent: expect.stringContaining(
+            'https://app.example.com/auth/verify?token=abc',
+          ),
         }),
       );
     });
@@ -106,7 +108,9 @@ describe('MailService', () => {
       const link = 'https://custom.domain/auth/verify?token=xyz123';
       await service.sendMagicLinkEmail('test@example.com', link);
 
-      const call = mockSendTransacEmail.mock.calls[0][0] as { htmlContent: string };
+      const call = mockSendTransacEmail.mock.calls[0][0] as {
+        htmlContent: string;
+      };
       expect(call.htmlContent).toContain(link);
       expect(call.htmlContent).toContain(`href="${link}"`);
     });

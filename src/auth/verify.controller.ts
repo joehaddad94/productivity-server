@@ -17,7 +17,9 @@ export class VerifyController {
   ) {}
 
   private setAuthCookie(res: Response, accessToken: string): void {
-    const expiresIn = this.config.get(AUTH_CONFIG.JWT_EXPIRES_IN) ?? AUTH_CONFIG.JWT_EXPIRES_IN_DEFAULT;
+    const expiresIn =
+      this.config.get<string>(AUTH_CONFIG.JWT_EXPIRES_IN) ??
+      AUTH_CONFIG.JWT_EXPIRES_IN_DEFAULT;
     const maxAgeSec = parseExpiresInToSeconds(expiresIn);
     const isProduction = this.config.get('NODE_ENV') === 'production';
     res.cookie(COOKIE_NAME, accessToken, {
@@ -30,10 +32,23 @@ export class VerifyController {
   }
 
   @Get('verify')
-  @ApiOperation({ summary: 'Fallback verify route for magic links landing on API host' })
-  @ApiQuery({ name: 'token', required: true, description: 'Token from magic link' })
-  @ApiResponse({ status: 200, description: 'Signed in; cookie set', type: AuthResponseDto })
-  @ApiResponse({ status: 302, description: 'Redirect to AUTH_VERIFY_REDIRECT_URL after setting cookie' })
+  @ApiOperation({
+    summary: 'Fallback verify route for magic links landing on API host',
+  })
+  @ApiQuery({
+    name: 'token',
+    required: true,
+    description: 'Token from magic link',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Signed in; cookie set',
+    type: AuthResponseDto,
+  })
+  @ApiResponse({
+    status: 302,
+    description: 'Redirect to AUTH_VERIFY_REDIRECT_URL after setting cookie',
+  })
   @ApiResponse({ status: 400, description: 'Invalid or expired link' })
   async verifyMagicLinkFallback(
     @Query('token') token: string,
@@ -42,7 +57,9 @@ export class VerifyController {
     const result = await this.authService.verifyMagicLink(token);
     this.setAuthCookie(res, result.accessToken);
 
-    const redirectUrl = this.config.get(AUTH_CONFIG.VERIFY_REDIRECT_URL);
+    const redirectUrl = this.config.get<string>(
+      AUTH_CONFIG.VERIFY_REDIRECT_URL,
+    );
     if (redirectUrl) {
       res.redirect(302, redirectUrl);
       return undefined as unknown as AuthResponseDto;

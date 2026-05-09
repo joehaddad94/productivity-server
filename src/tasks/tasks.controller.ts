@@ -10,9 +10,17 @@ import {
   UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ParseUUIDPipe } from '@nestjs/common/pipes';
-import { CurrentUser, RequestUser } from '../auth/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  RequestUser,
+} from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -80,7 +88,9 @@ export class TasksController {
   }
 
   @Post(':id/log-focus')
-  @ApiOperation({ summary: 'Increment per-task focus minutes and log to daily analytics' })
+  @ApiOperation({
+    summary: 'Increment per-task focus minutes and log to daily analytics',
+  })
   @ApiResponse({ status: 201, description: 'Focus minutes logged' })
   @ApiResponse({ status: 404, description: 'Task not found' })
   async logFocus(
@@ -89,7 +99,12 @@ export class TasksController {
     @CurrentUser() user: RequestUser,
     @Body('minutes', ParseIntPipe) minutes: number,
   ) {
-    const task = await this.tasksService.logFocus(workspaceId, id, user.id, minutes);
+    const task = await this.tasksService.logFocus(
+      workspaceId,
+      id,
+      user.id,
+      minutes,
+    );
     return { task };
   }
 

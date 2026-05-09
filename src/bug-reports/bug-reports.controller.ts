@@ -1,6 +1,14 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CurrentUser, RequestUser } from '../auth/decorators/current-user.decorator';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import {
+  CurrentUser,
+  RequestUser,
+} from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BugReportsService } from './bug-reports.service';
 import { CreateBugReportDto } from './dto/create-bug-report.dto';
@@ -15,7 +23,10 @@ export class BugReportsController {
   @Post()
   @ApiOperation({ summary: 'Submit a bug report (authenticated user)' })
   @ApiResponse({ status: 201, description: '{ bug }' })
-  async create(@CurrentUser() user: RequestUser, @Body() dto: CreateBugReportDto) {
+  async create(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: CreateBugReportDto,
+  ) {
     return this.bugReports.create(user.id, dto);
   }
 }

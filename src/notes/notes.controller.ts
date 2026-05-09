@@ -9,9 +9,17 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ParseUUIDPipe } from '@nestjs/common/pipes';
-import { CurrentUser, RequestUser } from '../auth/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  RequestUser,
+} from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { NotesService } from './notes.service';
 import { CreateNoteDto } from './dto/create-note.dto';

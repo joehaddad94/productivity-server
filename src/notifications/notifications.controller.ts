@@ -1,5 +1,14 @@
 import {
-  Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -7,7 +16,10 @@ import { NotificationsService } from './notifications.service';
 import { UpdateNotificationSettingsDto } from './dto/notification-settings.dto';
 import { SavePushSubscriptionDto } from './dto/push-subscription.dto';
 
-interface AuthenticatedUser { id: string; email: string }
+interface AuthenticatedUser {
+  id: string;
+  email: string;
+}
 
 @UseGuards(JwtAuthGuard)
 @Controller('workspaces/:workspaceId/notifications')
@@ -40,10 +52,7 @@ export class NotificationsController {
 
   @Patch(':id/read')
   @HttpCode(200)
-  markRead(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-  ) {
+  markRead(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.service.markRead(user.id, id);
   }
 
@@ -58,10 +67,7 @@ export class NotificationsController {
 
   @Delete(':id')
   @HttpCode(204)
-  dismiss(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-  ) {
+  dismiss(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.service.dismiss(user.id, id);
   }
 
@@ -118,9 +124,7 @@ export class NotificationsMeController {
 
   @Post('test')
   @HttpCode(200)
-  async sendTestNotification(
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
+  async sendTestNotification(@CurrentUser() user: AuthenticatedUser) {
     await this.service.createAndDeliver({
       userId: user.id,
       workspaceId: '',

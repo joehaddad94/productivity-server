@@ -15,16 +15,22 @@ export class UpdateNotificationSettingsDto {
 
   @IsOptional()
   @IsString()
-  @Matches(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'dailyAgendaTime must be HH:MM' })
+  @Matches(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: 'dailyAgendaTime must be HH:MM',
+  })
   dailyAgendaTime?: string;
 
   @IsOptional()
   @IsString()
-  @Matches(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'quietHoursStart must be HH:MM' })
+  @Matches(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: 'quietHoursStart must be HH:MM',
+  })
   quietHoursStart?: string | null;
 
   @IsOptional()
   @IsString()
-  @Matches(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'quietHoursEnd must be HH:MM' })
+  @Matches(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: 'quietHoursEnd must be HH:MM',
+  })
   quietHoursEnd?: string | null;
 }

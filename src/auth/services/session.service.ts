@@ -32,9 +32,12 @@ export class SessionService {
     return this.jwtService.sign(payload);
   }
 
-  async createSession(userId: string): Promise<{ id: string; expiresAt: Date }> {
+  async createSession(
+    userId: string,
+  ): Promise<{ id: string; expiresAt: Date }> {
     const expiresIn =
-      this.config.get(AUTH_CONFIG.JWT_EXPIRES_IN) ?? AUTH_CONFIG.JWT_EXPIRES_IN_DEFAULT;
+      this.config.get<string>(AUTH_CONFIG.JWT_EXPIRES_IN) ??
+      AUTH_CONFIG.JWT_EXPIRES_IN_DEFAULT;
     const expiresAt = new Date(Date.now() + parseExpiresInToMs(expiresIn));
     const token = randomBytes(32).toString('hex');
     const session = await this.prisma.session.create({

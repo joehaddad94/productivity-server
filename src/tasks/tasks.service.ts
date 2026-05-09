@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { membershipCache, membershipKey } from '../common/membership-cache';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Task } from '@prisma/client';
@@ -24,13 +25,18 @@ export class TasksService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  private async assertMember(workspaceId: string, userId: string): Promise<void> {
+  private async assertMember(
+    workspaceId: string,
+    userId: string,
+  ): Promise<void> {
+    const key = membershipKey(userId, workspaceId);
+    if (membershipCache.get(key)) return;
     const membership = await this.prisma.workspaceMember.findUnique({
       where: { userId_workspaceId: { userId, workspaceId } },
     });
-    if (!membership) {
+    if (!membership)
       throw new ForbiddenException("You don't have access to this workspace");
-    }
+    membershipCache.set(key, true);
   }
 
   async list(
@@ -49,8 +55,15 @@ export class TasksService {
       ...(query.search
         ? {
             OR: [
-              { title: { contains: query.search, mode: 'insensitive' as const } },
-              { description: { contains: query.search, mode: 'insensitive' as const } },
+              {
+                title: { contains: query.search, mode: 'insensitive' as const },
+              },
+              {
+                description: {
+                  contains: query.search,
+                  mode: 'insensitive' as const,
+                },
+              },
             ],
           }
         : {}),
@@ -68,7 +81,7 @@ export class TasksService {
     const limit = query.limit ?? 50;
     const skip = query.skip ?? 0;
 
-    const [tasks, total] = await this.prisma.$transaction([
+    const [tasks, total] = await Promise.all([
       this.prisma.task.findMany({
         where,
         include: {
@@ -95,7 +108,8 @@ export class TasksService {
     await this.assertMember(workspaceId, userId);
 
     const statusId =
-      dto.status ?? (await this.taskStatuses.getDefaultOpenStatusId(workspaceId));
+      dto.status ??
+      (await this.taskStatuses.getDefaultOpenStatusId(workspaceId));
     await this.taskStatuses.assertStatusInWorkspace(workspaceId, statusId);
     const terminal = await this.taskStatuses.isTerminal(workspaceId, statusId);
 
@@ -162,18 +176,28 @@ export class TasksService {
       where: { id },
       data: {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
-        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.description !== undefined
+          ? { description: dto.description }
+          : {}),
         ...(dto.dueDate !== undefined
           ? { dueDate: dto.dueDate ? new Date(dto.dueDate) : null }
           : {}),
         ...(dto.dueTime !== undefined ? { dueTime: dto.dueTime ?? null } : {}),
         ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
-        ...(dto.parentTaskId !== undefined ? { parentTaskId: dto.parentTaskId } : {}),
+        ...(dto.parentTaskId !== undefined
+          ? { parentTaskId: dto.parentTaskId }
+          : {}),
         ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
-        ...(dto.recurrenceRule !== undefined ? { recurrenceRule: dto.recurrenceRule ?? null } : {}),
-        ...(dto.projectId !== undefined ? { projectId: dto.projectId ?? null } : {}),
-        ...(completedAtPatch !== undefined ? { completedAt: completedAtPatch } : {}),
+        ...(dto.recurrenceRule !== undefined
+          ? { recurrenceRule: dto.recurrenceRule ?? null }
+          : {}),
+        ...(dto.projectId !== undefined
+          ? { projectId: dto.projectId ?? null }
+          : {}),
+        ...(completedAtPatch !== undefined
+          ? { completedAt: completedAtPatch }
+          : {}),
       },
     });
 
@@ -199,14 +223,20 @@ export class TasksService {
     return updated;
   }
 
-  private async notifyOtherMembers(workspaceId: string, completingUserId: string, taskTitle: string): Promise<void> {
+  private async notifyOtherMembers(
+    workspaceId: string,
+    completingUserId: string,
+    taskTitle: string,
+  ): Promise<void> {
     const members = await this.prisma.workspaceMember.findMany({
       where: { workspaceId, userId: { not: completingUserId } },
       include: { user: true },
     });
     if (members.length === 0) return;
 
-    const completingUser = await this.prisma.user.findUnique({ where: { id: completingUserId } });
+    const completingUser = await this.prisma.user.findUnique({
+      where: { id: completingUserId },
+    });
     const name = completingUser?.name ?? completingUser?.email ?? 'Someone';
 
     await Promise.all(
@@ -228,10 +258,10 @@ export class TasksService {
     task: Task,
     workspaceId: string,
   ): Promise<void> {
-    const rule = (task as any).recurrenceRule as RecurrenceRule | null;
-    if (!rule || !(task as any).dueDate) return;
+    const rule = task.recurrenceRule as RecurrenceRule | null;
+    if (!rule || !task.dueDate) return;
 
-    const currentDue = new Date((task as any).dueDate as Date);
+    const currentDue = new Date(task.dueDate);
     let nextDue: Date;
 
     if (rule === RecurrenceRule.DAILY) {
@@ -245,20 +275,21 @@ export class TasksService {
       nextDue.setMonth(nextDue.getMonth() + 1);
     }
 
-    const openStatusId = await this.taskStatuses.getDefaultOpenStatusId(workspaceId);
+    const openStatusId =
+      await this.taskStatuses.getDefaultOpenStatusId(workspaceId);
 
     await this.prisma.task.create({
       data: {
         workspaceId,
-        title: (task as any).title,
-        description: (task as any).description,
+        title: task.title,
+        description: task.description,
         dueDate: nextDue,
-        dueTime: (task as any).dueTime,
-        priority: (task as any).priority,
+        dueTime: task.dueTime,
+        priority: task.priority,
         status: openStatusId,
         recurrenceRule: rule,
         recurrenceParentId: task.id,
-        sortOrder: (task as any).sortOrder ?? 0,
+        sortOrder: task.sortOrder ?? 0,
       },
     });
   }
@@ -275,7 +306,9 @@ export class TasksService {
       data: { focusMinutes: { increment: minutes } },
     });
     if (minutes > 0) {
-      await this.analytics.logStat(workspaceId, userId, { focusMinutes: minutes });
+      await this.analytics.logStat(workspaceId, userId, {
+        focusMinutes: minutes,
+      });
     }
     return updated;
   }

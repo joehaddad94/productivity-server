@@ -151,6 +151,7 @@ model Project {
   tasks     Task[]
 
   @@index([workspaceId])
+  @@index([workspaceId, deletedAt])
   @@map("projects")
 }
 
@@ -185,6 +186,7 @@ model Task {
   @@index([workspaceId, status])
   @@index([parentTaskId])
   @@index([workspaceId, projectId])
+  @@index([workspaceId, deletedAt])
   @@map("tasks")
 }
 
@@ -209,6 +211,7 @@ model Note {
 
   @@index([workspaceId])
   @@index([workspaceId, projectId])
+  @@index([workspaceId, updatedAt])
   @@map("notes")
 }
 
@@ -227,7 +230,7 @@ model Notification {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  @@index([userId, workspaceId])
+  @@index([userId, workspaceId, createdAt(sort: Desc)])
   @@index([userId, read])
   @@map("notifications")
 }

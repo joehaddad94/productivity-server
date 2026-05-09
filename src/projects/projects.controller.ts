@@ -9,9 +9,17 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ParseUUIDPipe } from '@nestjs/common/pipes';
-import { CurrentUser, RequestUser } from '../auth/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  RequestUser,
+} from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
@@ -46,7 +54,11 @@ export class ProjectsController {
     @CurrentUser() user: RequestUser,
     @Body() dto: CreateProjectDto,
   ) {
-    const project = await this.projectsService.create(workspaceId, user.id, dto);
+    const project = await this.projectsService.create(
+      workspaceId,
+      user.id,
+      dto,
+    );
     return { project };
   }
 
@@ -59,7 +71,11 @@ export class ProjectsController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: RequestUser,
   ) {
-    const project = await this.projectsService.findOne(workspaceId, id, user.id);
+    const project = await this.projectsService.findOne(
+      workspaceId,
+      id,
+      user.id,
+    );
     return { project };
   }
 
@@ -73,7 +89,12 @@ export class ProjectsController {
     @CurrentUser() user: RequestUser,
     @Body() dto: UpdateProjectDto,
   ) {
-    const project = await this.projectsService.update(workspaceId, id, user.id, dto);
+    const project = await this.projectsService.update(
+      workspaceId,
+      id,
+      user.id,
+      dto,
+    );
     return { project };
   }
 

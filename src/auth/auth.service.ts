@@ -1,7 +1,5 @@
 import {
   ConflictException,
-  HttpException,
-  HttpStatus,
   Injectable,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -13,29 +11,8 @@ import { MailService } from '../mail/mail.service';
 import { SessionService } from './services/session.service';
 import { MagicLinkService } from './services/magic-link.service';
 import type { AuthResult, MagicLinkMessageResult } from './types/auth.types';
-
-/** Simple in-memory rate limiter: max 3 magic link requests per email per 10 minutes. */
-class MagicLinkRateLimiter {
-  private readonly window = 10 * 60 * 1000; // 10 minutes
-  private readonly max = 3;
-  private readonly counts = new Map<string, { count: number; resetAt: number }>();
-
-  check(email: string): void {
-    const now = Date.now();
-    const entry = this.counts.get(email);
-    if (!entry || now >= entry.resetAt) {
-      this.counts.set(email, { count: 1, resetAt: now + this.window });
-      return;
-    }
-    if (entry.count >= this.max) {
-      throw new HttpException(
-        'Too many magic link requests. Please wait 10 minutes before trying again.',
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    }
-    entry.count++;
-  }
-}
+import { sessionCache } from './strategies/jwt.strategy';
+import { MagicLinkRateLimiter } from './utils/magic-link-rate-limiter';
 
 @Injectable()
 export class AuthService {
@@ -56,13 +33,24 @@ export class AuthService {
       throw new ConflictException('A user with this email already exists');
     }
 
-    const { magicLink } = await this.magicLinkService.createMagicLink(normalized, dto.name);
-    const sent = await this.mailService.sendMagicLinkEmail(normalized, magicLink);
+    const { magicLink } = await this.magicLinkService.createMagicLink(
+      normalized,
+      dto.name,
+    );
+    const sent = await this.mailService.sendMagicLinkEmail(
+      normalized,
+      magicLink,
+    );
     if (!sent) {
-      throw new ServiceUnavailableException('Failed to send verification email. Please try again.');
+      throw new ServiceUnavailableException(
+        'Failed to send verification email. Please try again.',
+      );
     }
 
-    return { message: 'Check your email to complete signup. Click the link to access your account.' };
+    return {
+      message:
+        'Check your email to complete signup. Click the link to access your account.',
+    };
   }
 
   async login(dto: LoginDto): Promise<MagicLinkMessageResult> {
@@ -70,29 +58,48 @@ export class AuthService {
     this.rateLimiter.check(normalized);
     const user = await this.usersService.findByEmail(normalized);
     if (!user) {
-      throw new UnauthorizedException('No account found for this email. Please sign up first.');
+      throw new UnauthorizedException(
+        'No account found for this email. Please sign up first.',
+      );
     }
 
-    const { magicLink } = await this.magicLinkService.createMagicLink(normalized);
-    const sent = await this.mailService.sendMagicLinkEmail(normalized, magicLink);
+    const { magicLink } =
+      await this.magicLinkService.createMagicLink(normalized);
+    const sent = await this.mailService.sendMagicLinkEmail(
+      normalized,
+      magicLink,
+    );
     if (!sent) {
       return { message: 'Use the link below in dev.', magicLink };
     }
 
-    return { message: 'Check your email to sign in. Click the link to access your account.' };
+    return {
+      message:
+        'Check your email to sign in. Click the link to access your account.',
+    };
   }
 
   async logout(sessionId: string): Promise<void> {
+    sessionCache.delete(sessionId);
     await this.sessionService.revokeSession(sessionId);
   }
 
-  async sendMagicLink(email: string): Promise<{ magicLink?: string; message?: string }> {
+  async sendMagicLink(
+    email: string,
+  ): Promise<{ magicLink?: string; message?: string }> {
     const normalized = email.toLowerCase().trim();
     this.rateLimiter.check(normalized);
-    const { magicLink } = await this.magicLinkService.createMagicLink(normalized);
-    const sent = await this.mailService.sendMagicLinkEmail(normalized, magicLink);
+    const { magicLink } =
+      await this.magicLinkService.createMagicLink(normalized);
+    const sent = await this.mailService.sendMagicLinkEmail(
+      normalized,
+      magicLink,
+    );
     if (sent) {
-      return { message: 'If that email is registered, you will receive a magic link shortly.' };
+      return {
+        message:
+          'If that email is registered, you will receive a magic link shortly.',
+      };
     }
     return { magicLink };
   }
@@ -101,7 +108,10 @@ export class AuthService {
     const normalized = email.toLowerCase().trim();
     let user = await this.usersService.findByEmail(normalized);
     if (!user) {
-      user = await this.usersService.create({ email: normalized, name: name ?? null });
+      user = await this.usersService.create({
+        email: normalized,
+        name: name ?? null,
+      });
     }
     const session = await this.sessionService.createSession(user.id);
     const accessToken = this.sessionService.signToken({
@@ -110,7 +120,12 @@ export class AuthService {
       jti: session.id,
     });
     return {
-      user: { id: user.id, email: user.email, name: user.name, isAdmin: user.isAdmin },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        isAdmin: user.isAdmin,
+      },
       accessToken,
     };
   }
@@ -131,7 +146,12 @@ export class AuthService {
     });
 
     return {
-      user: { id: user.id, email: user.email, name: user.name, isAdmin: user.isAdmin },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        isAdmin: user.isAdmin,
+      },
       accessToken,
     };
   }

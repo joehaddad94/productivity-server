@@ -7,6 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AUTH_CONFIG } from '../config/auth-config';
 import { RequestUser } from '../decorators/current-user.decorator';
 import { UsersService } from '../../users/users.service';
+import { TtlCache } from '../../common/ttl-cache';
 
 interface JwtPayload {
   sub: string;
@@ -16,11 +17,18 @@ interface JwtPayload {
 
 function jwtFromCookieOrHeader(cookieName: string) {
   return (req: Request): string | null => {
-    const fromCookie = req?.cookies?.[cookieName];
+    const fromCookie = (req?.cookies as Record<string, string> | undefined)?.[
+      cookieName
+    ];
     if (fromCookie) return fromCookie;
     return ExtractJwt.fromAuthHeaderAsBearerToken()(req);
   };
 }
+
+// Cache validated sessions for 30s to avoid 2 DB round-trips on every request.
+// TTL is short enough that revoked sessions (logout) take effect within 30s.
+// On logout, sessionCache.delete(jti) is called immediately so revocation is instant.
+export const sessionCache = new TtlCache<RequestUser>(30_000, 1000);
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -37,6 +45,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: JwtPayload): Promise<RequestUser> {
+    const cached = sessionCache.get(payload.jti);
+    if (cached) return cached;
+
     const session = await this.prisma.session.findUnique({
       where: { id: payload.jti },
     });
@@ -48,7 +59,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     if (!user) {
       throw new UnauthorizedException('Session invalid. Please sign in again.');
     }
-    return {
+
+    const requestUser: RequestUser = {
       id: user.id,
       email: user.email,
       name: user.name,
@@ -56,5 +68,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       isAdmin: user.isAdmin,
       timezone: user.timezone ?? null,
     };
+
+    sessionCache.set(payload.jti, requestUser);
+    return requestUser;
   }
 }

@@ -1,8 +1,6 @@
-import {
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { membershipCache, membershipKey } from '../common/membership-cache';
 import { DailyStat } from '@prisma/client';
 import { QueryAnalyticsDto } from './dto/query-analytics.dto';
 import { LogStatDto } from './dto/log-stat.dto';
@@ -20,13 +18,18 @@ export interface AnalyticsResult {
 export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async assertMember(workspaceId: string, userId: string): Promise<void> {
+  private async assertMember(
+    workspaceId: string,
+    userId: string,
+  ): Promise<void> {
+    const key = membershipKey(userId, workspaceId);
+    if (membershipCache.get(key)) return;
     const membership = await this.prisma.workspaceMember.findUnique({
       where: { userId_workspaceId: { userId, workspaceId } },
     });
-    if (!membership) {
+    if (!membership)
       throw new ForbiddenException("You don't have access to this workspace");
-    }
+    membershipCache.set(key, true);
   }
 
   private computeStreak(stats: DailyStat[]): number {

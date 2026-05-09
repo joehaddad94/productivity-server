@@ -38,7 +38,9 @@ export class CreateBugReportDto {
   @IsUUID()
   workspaceId?: string;
 
-  @ApiPropertyOptional({ description: 'Client diagnostics (route, version, etc.)' })
+  @ApiPropertyOptional({
+    description: 'Client diagnostics (route, version, etc.)',
+  })
   @IsOptional()
   @IsObject()
   contextJson?: Record<string, unknown>;
