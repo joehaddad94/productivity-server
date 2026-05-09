@@ -39,4 +39,32 @@ Auth: HttpOnly cookie via `dev-session`.
 
 ### Known pending improvements
 
-- **#1** — Add in-process session/user TTL cache in `JwtStrategy.validate()`. Expected: cuts ~500ms off every authenticated request.
+- **#1** ✅ Resolved in 2026-05-10 benchmark below.
+
+---
+
+## 2026-05-10 — After JWT session cache
+
+Change: added `TtlCache` (30s TTL, max 1000 entries) in `JwtStrategy.validate()`.  
+Cache hit skips both DB round-trips. Logout calls `sessionCache.delete(jti)` immediately.
+
+| Endpoint | Min | P50 | Avg | Max | vs 2026-05-09 |
+|---|---:|---:|---:|---:|---:|
+| `GET /auth/me` | 21ms | 22ms | 22ms | 24ms | **-535ms** |
+| `GET /workspaces/:id/notifications/unread-count` | 275ms | 279ms | 280ms | 290ms | -613ms |
+| `GET /calendar-connections` | 274ms | 282ms | 284ms | 299ms | -852ms |
+| `GET /workspaces` | 526ms | 534ms | 549ms | 619ms | -509ms |
+| `GET /workspaces/:id` | 518ms | 530ms | 537ms | 564ms | -514ms |
+| `GET /workspaces/:id/analytics` | 776ms | 780ms | 807ms | 906ms | -689ms |
+| `GET /workspaces/:id/task-statuses` | 773ms | 795ms | 796ms | 818ms | -544ms |
+| `GET /workspaces/:id/notifications` | 1025ms | 1037ms | 1038ms | 1052ms | -709ms |
+| `GET /workspaces/:id/notes` | 1279ms | 1285ms | 1300ms | 1369ms | -586ms |
+| `GET /workspaces/:id/projects` | 1276ms | 1347ms | 1412ms | 1770ms | -469ms |
+| `GET /notifications/settings` | 1285ms | 1322ms | 1326ms | 1383ms | -544ms |
+| `GET /workspaces/:id/tasks` | 1559ms | 1589ms | 1589ms | 1620ms | -614ms |
+
+### Observations
+
+- JWT guard overhead eliminated on cache hits: ~550ms → ~0ms per authenticated request.
+- Remaining latency is pure DB query cost against remote Supabase.
+- List endpoints (`/tasks` 1.6s, `/notes` 1.3s, `/projects` 1.4s) are next to investigate — likely heavy joins or missing indexes.
