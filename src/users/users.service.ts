@@ -27,12 +27,17 @@ export class UsersService {
     });
   }
 
-  async updateProfile(id: string, data: { name?: string; timezone?: string }): Promise<User> {
+  async updateProfile(
+    id: string,
+    data: { name?: string; timezone?: string },
+  ): Promise<User> {
     return this.prisma.user.update({
       where: { id },
       data: {
         ...(data.name !== undefined ? { name: data.name.trim() || null } : {}),
-        ...(data.timezone !== undefined ? { timezone: data.timezone || null } : {}),
+        ...(data.timezone !== undefined
+          ? { timezone: data.timezone || null }
+          : {}),
       },
     });
   }

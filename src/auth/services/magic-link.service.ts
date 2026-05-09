@@ -50,7 +50,9 @@ export class MagicLinkService {
       throw new BadRequestException('Invalid or expired link');
     }
     if (record.expiresAt < new Date()) {
-      await this.prisma.verificationToken.delete({ where: { id: record.id } }).catch(() => {});
+      await this.prisma.verificationToken
+        .delete({ where: { id: record.id } })
+        .catch(() => {});
       throw new BadRequestException('Link has expired');
     }
     const tokenRecord = record as { email: string; name?: string | null };

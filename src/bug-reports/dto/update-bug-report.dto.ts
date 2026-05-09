@@ -1,7 +1,20 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsISO8601, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
+import {
+  IsIn,
+  IsISO8601,
+  IsOptional,
+  IsString,
+  MaxLength,
+  ValidateIf,
+} from 'class-validator';
 
-const BUG_STATUSES = ['open', 'triaging', 'fixed', 'wontfix', 'duplicate'] as const;
+const BUG_STATUSES = [
+  'open',
+  'triaging',
+  'fixed',
+  'wontfix',
+  'duplicate',
+] as const;
 
 export class UpdateBugReportDto {
   @ApiPropertyOptional({ enum: BUG_STATUSES })

@@ -17,13 +17,17 @@ export class NotesService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private async assertMember(workspaceId: string, userId: string): Promise<void> {
+  private async assertMember(
+    workspaceId: string,
+    userId: string,
+  ): Promise<void> {
     const key = membershipKey(userId, workspaceId);
     if (membershipCache.get(key)) return;
     const membership = await this.prisma.workspaceMember.findUnique({
       where: { userId_workspaceId: { userId, workspaceId } },
     });
-    if (!membership) throw new ForbiddenException("You don't have access to this workspace");
+    if (!membership)
+      throw new ForbiddenException("You don't have access to this workspace");
     membershipCache.set(key, true);
   }
 
@@ -36,7 +40,10 @@ export class NotesService {
     await this.assertMember(workspaceId, userId);
 
     const tagList = query.tags
-      ? query.tags.split(',').map((t) => t.trim()).filter(Boolean)
+      ? query.tags
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean)
       : undefined;
 
     const where = {
@@ -44,13 +51,25 @@ export class NotesService {
       ...(query.search
         ? {
             OR: [
-              { title: { contains: query.search, mode: 'insensitive' as const } },
-              { content: { contains: query.search, mode: 'insensitive' as const } },
+              {
+                title: { contains: query.search, mode: 'insensitive' as const },
+              },
+              {
+                content: {
+                  contains: query.search,
+                  mode: 'insensitive' as const,
+                },
+              },
             ],
           }
         : {}),
       ...(tagList?.length
-        ? { tags: query.tagMode === 'all' ? { hasEvery: tagList } : { hasSome: tagList } }
+        ? {
+            tags:
+              query.tagMode === 'all'
+                ? { hasEvery: tagList }
+                : { hasSome: tagList },
+          }
         : {}),
       ...(query.projectId ? { projectId: query.projectId } : {}),
       ...(query.taskId ? { taskId: query.taskId } : {}),
@@ -60,18 +79,29 @@ export class NotesService {
     const skip = query.skip ?? 0;
 
     const [notes, total] = await Promise.all([
-      this.prisma.note.findMany({ where, orderBy: { updatedAt: 'desc' }, take: limit, skip }),
+      this.prisma.note.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        take: limit,
+        skip,
+      }),
       this.prisma.note.count({ where }),
     ]);
 
-    this.logger.log(
-      `listNotes workspace=${workspaceId} user=${userId} notes=${notes.length}/${total} +${Date.now() - startedAt}ms`,
-    );
+    if (process.env.NODE_ENV !== 'production') {
+      this.logger.log(
+        `listNotes workspace=${workspaceId} user=${userId} notes=${notes.length}/${total} +${Date.now() - startedAt}ms`,
+      );
+    }
 
     return { notes, total };
   }
 
-  async create(workspaceId: string, userId: string, dto: CreateNoteDto): Promise<Note> {
+  async create(
+    workspaceId: string,
+    userId: string,
+    dto: CreateNoteDto,
+  ): Promise<Note> {
     const startedAt = Date.now();
     await this.assertMember(workspaceId, userId);
 
@@ -88,14 +118,20 @@ export class NotesService {
       },
     });
 
-    this.logger.log(
-      `createNote workspace=${workspaceId} user=${userId} note=${note.id} +${Date.now() - startedAt}ms`,
-    );
+    if (process.env.NODE_ENV !== 'production') {
+      this.logger.log(
+        `createNote workspace=${workspaceId} user=${userId} note=${note.id} +${Date.now() - startedAt}ms`,
+      );
+    }
 
     return note;
   }
 
-  async findOne(workspaceId: string, id: string, userId: string): Promise<Note> {
+  async findOne(
+    workspaceId: string,
+    id: string,
+    userId: string,
+  ): Promise<Note> {
     await this.assertMember(workspaceId, userId);
 
     const note = await this.prisma.note.findFirst({

@@ -22,13 +22,17 @@ export class TagsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private async assertMember(workspaceId: string, userId: string): Promise<void> {
+  private async assertMember(
+    workspaceId: string,
+    userId: string,
+  ): Promise<void> {
     const key = membershipKey(userId, workspaceId);
     if (membershipCache.get(key)) return;
     const membership = await this.prisma.workspaceMember.findUnique({
       where: { userId_workspaceId: { userId, workspaceId } },
     });
-    if (!membership) throw new ForbiddenException("You don't have access to this workspace");
+    if (!membership)
+      throw new ForbiddenException("You don't have access to this workspace");
     membershipCache.set(key, true);
   }
 
@@ -41,7 +45,9 @@ export class TagsService {
       const n = t.trim().toLowerCase();
       if (!n) continue;
       if (n.length > MAX_TAG_LENGTH) {
-        throw new BadRequestException(`Tag "${n}" exceeds ${MAX_TAG_LENGTH} characters`);
+        throw new BadRequestException(
+          `Tag "${n}" exceeds ${MAX_TAG_LENGTH} characters`,
+        );
       }
       if (!seen.has(n)) {
         seen.add(n);
@@ -133,7 +139,9 @@ export class TagsService {
   ): Promise<WorkspaceTagCount[]> {
     await this.assertMember(workspaceId, userId);
 
-    const rows = await this.prisma.$queryRaw<Array<{ tag: string; count: bigint | number }>>(
+    const rows = await this.prisma.$queryRaw<
+      Array<{ tag: string; count: bigint | number }>
+    >(
       Prisma.sql`
         SELECT unnest(tags) AS tag, COUNT(*)::int AS count
         FROM notes

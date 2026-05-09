@@ -22,13 +22,21 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       useFactory: (config: ConfigService) => ({
         secret: config.getOrThrow<string>(AUTH_CONFIG.JWT_SECRET),
         signOptions: {
-          expiresIn: config.get(AUTH_CONFIG.JWT_EXPIRES_IN) ?? AUTH_CONFIG.JWT_EXPIRES_IN_DEFAULT,
+          expiresIn:
+            config.get(AUTH_CONFIG.JWT_EXPIRES_IN) ??
+            AUTH_CONFIG.JWT_EXPIRES_IN_DEFAULT,
         },
       }),
     }),
   ],
   controllers: [AuthController, VerifyController],
-  providers: [AuthService, SessionService, MagicLinkService, JwtStrategy, JwtAuthGuard],
+  providers: [
+    AuthService,
+    SessionService,
+    MagicLinkService,
+    JwtStrategy,
+    JwtAuthGuard,
+  ],
   exports: [AuthService, JwtModule, JwtAuthGuard],
 })
 export class AuthModule {}

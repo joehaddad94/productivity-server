@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsEnum, IsUUID, ArrayMinSize, ArrayMaxSize } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsUUID,
+  ArrayMinSize,
+  ArrayMaxSize,
+} from 'class-validator';
 
 export enum BulkTaskAction {
   COMPLETE = 'complete',

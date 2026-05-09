@@ -9,9 +9,15 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentUser, RequestUser } from '../auth/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  RequestUser,
+} from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CalendarConnectionsService, type CalendarEvent } from './calendar-connections.service';
+import {
+  CalendarConnectionsService,
+  type CalendarEvent,
+} from './calendar-connections.service';
 
 @ApiTags('calendar-connections')
 @Controller('calendar-connections')
@@ -48,8 +54,11 @@ export class CalendarConnectionsController {
   ) {
     const userId = this.service.verifyOAuthState(state);
     await this.service.handleGoogleCallback(userId, code);
-    const frontendUrl = this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
-    return { url: `${frontendUrl}/settings?calendar=connected&provider=google` };
+    const frontendUrl =
+      this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
+    return {
+      url: `${frontendUrl}/settings?calendar=connected&provider=google`,
+    };
   }
 
   @Get('microsoft/auth')
@@ -69,8 +78,11 @@ export class CalendarConnectionsController {
   ) {
     const userId = this.service.verifyOAuthState(state);
     await this.service.handleMicrosoftCallback(userId, code);
-    const frontendUrl = this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
-    return { url: `${frontendUrl}/settings?calendar=connected&provider=microsoft` };
+    const frontendUrl =
+      this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
+    return {
+      url: `${frontendUrl}/settings?calendar=connected&provider=microsoft`,
+    };
   }
 
   @Delete(':provider')

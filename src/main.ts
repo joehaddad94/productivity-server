@@ -32,7 +32,8 @@ async function bootstrap() {
 
       // Keep preflight logs compact since browsers produce many of them.
       if (isPreflight) {
-        if (ms >= 200) httpLogger.warn(`PREFLIGHT ${normalized} ${statusCode} +${ms}ms`);
+        if (ms >= 200)
+          httpLogger.warn(`PREFLIGHT ${normalized} ${statusCode} +${ms}ms`);
         return;
       }
 

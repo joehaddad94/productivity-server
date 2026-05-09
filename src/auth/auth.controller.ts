@@ -10,7 +10,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Response } from 'express';
 import { AUTH_CONFIG, parseExpiresInToSeconds } from './config/auth-config';
 import { AuthResponseDto } from './dto/auth-response.dto';
@@ -34,7 +41,9 @@ export class AuthController {
   ) {}
 
   private setAuthCookie(res: Response, accessToken: string): void {
-    const expiresIn = this.config.get(AUTH_CONFIG.JWT_EXPIRES_IN) ?? AUTH_CONFIG.JWT_EXPIRES_IN_DEFAULT;
+    const expiresIn =
+      this.config.get(AUTH_CONFIG.JWT_EXPIRES_IN) ??
+      AUTH_CONFIG.JWT_EXPIRES_IN_DEFAULT;
     const maxAgeSec = parseExpiresInToSeconds(expiresIn);
     const isProduction = this.config.get('NODE_ENV') === 'production';
     res.cookie(COOKIE_NAME, accessToken, {
@@ -57,20 +66,36 @@ export class AuthController {
   }
 
   @Post('register')
-  @ApiOperation({ summary: 'Register: save email, send magic link. No sign-in until user clicks link.' })
+  @ApiOperation({
+    summary:
+      'Register: save email, send magic link. No sign-in until user clicks link.',
+  })
   @ApiBody({ type: RegisterDto })
-  @ApiResponse({ status: 201, description: 'User created; check email for magic link' })
+  @ApiResponse({
+    status: 201,
+    description: 'User created; check email for magic link',
+  })
   @ApiResponse({ status: 409, description: 'Email already registered' })
-  async register(@Body() dto: RegisterDto): Promise<{ message: string; magicLink?: string }> {
+  async register(
+    @Body() dto: RegisterDto,
+  ): Promise<{ message: string; magicLink?: string }> {
     return this.authService.register(dto);
   }
 
   @Post('login')
-  @ApiOperation({ summary: 'Request magic link to sign in; no session until user clicks link' })
+  @ApiOperation({
+    summary: 'Request magic link to sign in; no session until user clicks link',
+  })
   @ApiBody({ type: LoginDto })
-  @ApiResponse({ status: 200, description: 'Magic link sent; check email (or link in body when SMTP not configured)' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Magic link sent; check email (or link in body when SMTP not configured)',
+  })
   @ApiResponse({ status: 401, description: 'No account for this email' })
-  async login(@Body() dto: LoginDto): Promise<{ message: string; magicLink?: string }> {
+  async login(
+    @Body() dto: LoginDto,
+  ): Promise<{ message: string; magicLink?: string }> {
     return this.authService.login(dto);
   }
 
@@ -90,18 +115,41 @@ export class AuthController {
   }
 
   @Post('send-magic-link')
-  @ApiOperation({ summary: 'Send magic link to email (via SMTP if SMTP_USER/SMTP_PASS are set)' })
+  @ApiOperation({
+    summary:
+      'Send magic link to email (via SMTP if SMTP_USER/SMTP_PASS are set)',
+  })
   @ApiBody({ type: SendMagicLinkDto })
-  @ApiResponse({ status: 200, description: 'Magic link sent by email, or link in body when SMTP not configured' })
-  async sendMagicLink(@Body() dto: SendMagicLinkDto): Promise<{ magicLink?: string; message?: string }> {
+  @ApiResponse({
+    status: 200,
+    description:
+      'Magic link sent by email, or link in body when SMTP not configured',
+  })
+  async sendMagicLink(
+    @Body() dto: SendMagicLinkDto,
+  ): Promise<{ magicLink?: string; message?: string }> {
     return this.authService.sendMagicLink(dto.email);
   }
 
   @Get('verify')
-  @ApiOperation({ summary: 'Verify magic link; JWT in HttpOnly cookie. Redirects to AUTH_VERIFY_REDIRECT_URL if set.' })
-  @ApiQuery({ name: 'token', required: true, description: 'Token from magic link' })
-  @ApiResponse({ status: 200, description: 'Signed in; cookie set', type: AuthResponseDto })
-  @ApiResponse({ status: 302, description: 'Redirect to AUTH_VERIFY_REDIRECT_URL after setting cookie' })
+  @ApiOperation({
+    summary:
+      'Verify magic link; JWT in HttpOnly cookie. Redirects to AUTH_VERIFY_REDIRECT_URL if set.',
+  })
+  @ApiQuery({
+    name: 'token',
+    required: true,
+    description: 'Token from magic link',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Signed in; cookie set',
+    type: AuthResponseDto,
+  })
+  @ApiResponse({
+    status: 302,
+    description: 'Redirect to AUTH_VERIFY_REDIRECT_URL after setting cookie',
+  })
   @ApiResponse({ status: 400, description: 'Invalid or expired link' })
   async verifyMagicLink(
     @Query('token') token: string,
@@ -121,7 +169,9 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get current user (cookie or Authorization header)' })
+  @ApiOperation({
+    summary: 'Get current user (cookie or Authorization header)',
+  })
   @ApiResponse({ status: 200, description: 'Current user' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   me(@CurrentUser() user: RequestUser) {
@@ -146,7 +196,10 @@ export class AuthController {
     @CurrentUser() user: RequestUser,
     @Body() body: { name?: string; timezone?: string },
   ) {
-    const updated = await this.usersService.updateProfile(user.id, { name: body.name, timezone: body.timezone });
+    const updated = await this.usersService.updateProfile(user.id, {
+      name: body.name,
+      timezone: body.timezone,
+    });
     return {
       user: {
         id: updated.id,
@@ -161,7 +214,9 @@ export class AuthController {
   @Delete('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Permanently delete the current user account and all data' })
+  @ApiOperation({
+    summary: 'Permanently delete the current user account and all data',
+  })
   @ApiResponse({ status: 200, description: 'Account deleted' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async deleteMe(@CurrentUser() user: RequestUser) {
@@ -174,7 +229,9 @@ export class AuthController {
    * Disabled in production (NODE_ENV=production).
    */
   @Post('dev-session')
-  @ApiOperation({ summary: '[Dev/test only] Instantly create an authenticated session' })
+  @ApiOperation({
+    summary: '[Dev/test only] Instantly create an authenticated session',
+  })
   @ApiResponse({ status: 201, description: 'Session created; cookie set' })
   @ApiResponse({ status: 403, description: 'Not available in production' })
   async devSession(
@@ -186,9 +243,11 @@ export class AuthController {
       return;
     }
 
-    const result = await this.authService.createDevSession(body.email, body.name);
+    const result = await this.authService.createDevSession(
+      body.email,
+      body.name,
+    );
     this.setAuthCookie(res, result.accessToken);
     return { user: result.user };
   }
-
 }

@@ -15,7 +15,10 @@ const OPEN_STATUSES = ['open', 'triaging'];
 export class BugReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async assertWorkspaceMember(workspaceId: string, userId: string): Promise<void> {
+  private async assertWorkspaceMember(
+    workspaceId: string,
+    userId: string,
+  ): Promise<void> {
     const m = await this.prisma.workspaceMember.findUnique({
       where: { userId_workspaceId: { userId, workspaceId } },
     });

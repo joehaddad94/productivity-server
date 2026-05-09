@@ -24,11 +24,19 @@ function parseHour(hhmm: string): number {
 }
 
 /** Returns UTC-midnight Date objects that represent today/tomorrow in the user's local timezone. */
-function getLocalDayBoundaries(timezone: string | null | undefined): { today: Date; tomorrow: Date } {
+function getLocalDayBoundaries(timezone: string | null | undefined): {
+  today: Date;
+  tomorrow: Date;
+} {
   const tz = timezone ?? 'UTC';
   try {
     // 'en-CA' locale uses YYYY-MM-DD format which is easy to parse
-    const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const dateStr = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
     const today = new Date(dateStr + 'T00:00:00Z');
     const tomorrow = new Date(today);
     tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
@@ -82,7 +90,11 @@ export class NotificationsScheduler {
   }
 
   private async runDailyAgenda(
-    member: { userId: string; workspaceId: string; user: { email: string; timezone: string | null } },
+    member: {
+      userId: string;
+      workspaceId: string;
+      user: { email: string; timezone: string | null };
+    },
     settings: { inApp: boolean; email: boolean; push: boolean },
   ) {
     const { today, tomorrow } = getLocalDayBoundaries(member.user.timezone);
@@ -98,22 +110,38 @@ export class NotificationsScheduler {
     });
     if (existing) return;
 
-    const terminalIds = await this.taskStatuses.terminalStatusIds(member.workspaceId);
-    const notDone = terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
+    const terminalIds = await this.taskStatuses.terminalStatusIds(
+      member.workspaceId,
+    );
+    const notDone =
+      terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
 
     const [dueTodayCount, overdueCount] = await Promise.all([
       this.prisma.task.count({
-        where: { workspaceId: member.workspaceId, dueDate: { gte: today, lt: tomorrow }, ...notDone, deletedAt: null },
+        where: {
+          workspaceId: member.workspaceId,
+          dueDate: { gte: today, lt: tomorrow },
+          ...notDone,
+          deletedAt: null,
+        },
       }),
       this.prisma.task.count({
-        where: { workspaceId: member.workspaceId, dueDate: { lt: today }, ...notDone, deletedAt: null },
+        where: {
+          workspaceId: member.workspaceId,
+          dueDate: { lt: today },
+          ...notDone,
+          deletedAt: null,
+        },
       }),
     ]);
 
     if (dueTodayCount === 0 && overdueCount === 0) return;
 
     const parts: string[] = [];
-    if (dueTodayCount > 0) parts.push(`${dueTodayCount} task${dueTodayCount > 1 ? 's' : ''} due today`);
+    if (dueTodayCount > 0)
+      parts.push(
+        `${dueTodayCount} task${dueTodayCount > 1 ? 's' : ''} due today`,
+      );
     if (overdueCount > 0) parts.push(`${overdueCount} overdue`);
 
     await this.notifications.createAndDeliver({
@@ -127,23 +155,38 @@ export class NotificationsScheduler {
     });
   }
 
-  private async runOverdueCheck(
-    member: { userId: string; workspaceId: string; user: { email: string; timezone: string | null } },
-  ) {
+  private async runOverdueCheck(member: {
+    userId: string;
+    workspaceId: string;
+    user: { email: string; timezone: string | null };
+  }) {
     const { today } = getLocalDayBoundaries(member.user.timezone);
 
-    const terminalIds = await this.taskStatuses.terminalStatusIds(member.workspaceId);
-    const notDone = terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
+    const terminalIds = await this.taskStatuses.terminalStatusIds(
+      member.workspaceId,
+    );
+    const notDone =
+      terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
 
     const overdueTasks = await this.prisma.task.findMany({
-      where: { workspaceId: member.workspaceId, dueDate: { lt: today }, ...notDone, deletedAt: null },
+      where: {
+        workspaceId: member.workspaceId,
+        dueDate: { lt: today },
+        ...notDone,
+        deletedAt: null,
+      },
       take: 5,
       orderBy: { dueDate: 'asc' },
     });
 
     for (const task of overdueTasks) {
       const existingToday = await this.prisma.notification.findFirst({
-        where: { userId: member.userId, taskId: task.id, type: 'overdue', createdAt: { gte: today } },
+        where: {
+          userId: member.userId,
+          taskId: task.id,
+          type: 'overdue',
+          createdAt: { gte: today },
+        },
       });
       if (existingToday) continue;
 
@@ -161,23 +204,38 @@ export class NotificationsScheduler {
     }
   }
 
-  private async runDueTodayReminder(
-    member: { userId: string; workspaceId: string; user: { email: string; timezone: string | null } },
-  ) {
+  private async runDueTodayReminder(member: {
+    userId: string;
+    workspaceId: string;
+    user: { email: string; timezone: string | null };
+  }) {
     const { today, tomorrow } = getLocalDayBoundaries(member.user.timezone);
 
-    const terminalIds = await this.taskStatuses.terminalStatusIds(member.workspaceId);
-    const notDone = terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
+    const terminalIds = await this.taskStatuses.terminalStatusIds(
+      member.workspaceId,
+    );
+    const notDone =
+      terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
 
     const dueTasks = await this.prisma.task.findMany({
-      where: { workspaceId: member.workspaceId, dueDate: { gte: today, lt: tomorrow }, ...notDone, deletedAt: null },
+      where: {
+        workspaceId: member.workspaceId,
+        dueDate: { gte: today, lt: tomorrow },
+        ...notDone,
+        deletedAt: null,
+      },
       take: 5,
       orderBy: { priority: 'desc' },
     });
 
     for (const task of dueTasks) {
       const existingToday = await this.prisma.notification.findFirst({
-        where: { userId: member.userId, taskId: task.id, type: 'due_today', createdAt: { gte: today } },
+        where: {
+          userId: member.userId,
+          taskId: task.id,
+          type: 'due_today',
+          createdAt: { gte: today },
+        },
       });
       if (existingToday) continue;
 

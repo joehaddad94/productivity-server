@@ -1,7 +1,22 @@
-import { Body, Controller, Delete, Param, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ParseUUIDPipe } from '@nestjs/common/pipes';
-import { CurrentUser, RequestUser } from '../auth/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  RequestUser,
+} from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AddTagsDto } from './dto/add-tags.dto';
 import { TagsService } from './tags.service';
@@ -24,7 +39,12 @@ export class NoteTagsController {
     @CurrentUser() user: RequestUser,
     @Body() dto: AddTagsDto,
   ) {
-    const note = await this.tagsService.addTags(workspaceId, noteId, user.id, dto.tags);
+    const note = await this.tagsService.addTags(
+      workspaceId,
+      noteId,
+      user.id,
+      dto.tags,
+    );
     return { note };
   }
 

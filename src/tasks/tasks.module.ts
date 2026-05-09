@@ -7,7 +7,12 @@ import { TasksController } from './tasks.controller';
 import { TasksService } from './tasks.service';
 
 @Module({
-  imports: [AuthModule, AnalyticsModule, TaskStatusesModule, NotificationsModule],
+  imports: [
+    AuthModule,
+    AnalyticsModule,
+    TaskStatusesModule,
+    NotificationsModule,
+  ],
   controllers: [TasksController],
   providers: [TasksService],
   exports: [TasksService],

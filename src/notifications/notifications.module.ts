@@ -2,7 +2,10 @@ import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TaskStatusesModule } from '../task-statuses/task-statuses.module';
 import { NotificationsService } from './notifications.service';
-import { NotificationsController, NotificationsMeController } from './notifications.controller';
+import {
+  NotificationsController,
+  NotificationsMeController,
+} from './notifications.controller';
 import { NotificationsScheduler } from './notifications.scheduler';
 
 @Module({

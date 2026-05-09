@@ -61,10 +61,10 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    usersService = module.get(UsersService) as typeof mockUsersService;
-    mailService = module.get(MailService) as typeof mockMailService;
-    sessionService = module.get(SessionService) as typeof mockSessionService;
-    magicLinkService = module.get(MagicLinkService) as typeof mockMagicLinkService;
+    usersService = module.get(UsersService);
+    mailService = module.get(MailService);
+    sessionService = module.get(SessionService);
+    magicLinkService = module.get(MagicLinkService);
 
     jest.clearAllMocks();
   });

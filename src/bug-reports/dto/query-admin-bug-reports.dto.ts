@@ -2,7 +2,13 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
-const BUG_STATUSES = ['open', 'triaging', 'fixed', 'wontfix', 'duplicate'] as const;
+const BUG_STATUSES = [
+  'open',
+  'triaging',
+  'fixed',
+  'wontfix',
+  'duplicate',
+] as const;
 
 export class QueryAdminBugReportsDto {
   @ApiPropertyOptional({ enum: [...BUG_STATUSES, 'all'] })

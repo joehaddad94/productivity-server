@@ -8,7 +8,10 @@ export class MailService {
 
   constructor(private readonly config: ConfigService) {}
 
-  private getClient(): { emails: BrevoClient['transactionalEmails']; from: { name: string; email: string } } | null {
+  private getClient(): {
+    emails: BrevoClient['transactionalEmails'];
+    from: { name: string; email: string };
+  } | null {
     const apiKey = this.config.get<string>('BREVO_API_KEY');
     if (!apiKey) {
       this.logger.warn('BREVO_API_KEY is not set — email sending is disabled');
@@ -17,9 +20,13 @@ export class MailService {
 
     const client = new BrevoClient({ apiKey });
     const fromName = this.config.get<string>('SMTP_FROM_NAME') ?? 'Tasky';
-    const fromEmail = this.config.get<string>('SMTP_FROM_EMAIL') ?? 'noreply@tasky.app';
+    const fromEmail =
+      this.config.get<string>('SMTP_FROM_EMAIL') ?? 'noreply@tasky.app';
 
-    return { emails: client.transactionalEmails, from: { name: fromName, email: fromEmail } };
+    return {
+      emails: client.transactionalEmails,
+      from: { name: fromName, email: fromEmail },
+    };
   }
 
   async sendMagicLinkEmail(to: string, magicLink: string): Promise<boolean> {
@@ -36,12 +43,19 @@ export class MailService {
       this.logger.log(`Magic link email sent to ${to}`);
       return true;
     } catch (err) {
-      this.logger.error(`Failed to send magic link to ${to}: ${err instanceof Error ? err.message : String(err)}`, err instanceof Error ? err.stack : undefined);
+      this.logger.error(
+        `Failed to send magic link to ${to}: ${err instanceof Error ? err.message : String(err)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
       return false;
     }
   }
 
-  async sendNotificationEmail(to: string, title: string, body: string): Promise<boolean> {
+  async sendNotificationEmail(
+    to: string,
+    title: string,
+    body: string,
+  ): Promise<boolean> {
     const ctx = this.getClient();
     if (!ctx) return false;
 
@@ -62,12 +76,19 @@ export class MailService {
       this.logger.log(`Notification email sent to ${to}: ${title}`);
       return true;
     } catch (err) {
-      this.logger.error(`Failed to send notification email to ${to}: ${err instanceof Error ? err.message : String(err)}`);
+      this.logger.error(
+        `Failed to send notification email to ${to}: ${err instanceof Error ? err.message : String(err)}`,
+      );
       return false;
     }
   }
 
-  async sendInviteEmail(to: string, workspaceName: string, inviteLink: string, recipientName: string): Promise<boolean> {
+  async sendInviteEmail(
+    to: string,
+    workspaceName: string,
+    inviteLink: string,
+    recipientName: string,
+  ): Promise<boolean> {
     const ctx = this.getClient();
     if (!ctx) return false;
 
@@ -76,17 +97,28 @@ export class MailService {
         sender: ctx.from,
         to: [{ email: to }],
         subject: `You've been invited to ${workspaceName} on Tasky`,
-        htmlContent: this.getInviteHtml(recipientName, workspaceName, inviteLink),
+        htmlContent: this.getInviteHtml(
+          recipientName,
+          workspaceName,
+          inviteLink,
+        ),
       });
       this.logger.log(`Invite email sent to ${to}`);
       return true;
     } catch (err) {
-      this.logger.error(`Failed to send invite to ${to}: ${err instanceof Error ? err.message : String(err)}`, err instanceof Error ? err.stack : undefined);
+      this.logger.error(
+        `Failed to send invite to ${to}: ${err instanceof Error ? err.message : String(err)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
       return false;
     }
   }
 
-  private getInviteHtml(recipientName: string, workspaceName: string, inviteLink: string): string {
+  private getInviteHtml(
+    recipientName: string,
+    workspaceName: string,
+    inviteLink: string,
+  ): string {
     return `
       <p>Hi ${recipientName},</p>
       <p>You've been invited to join the workspace <strong>${workspaceName}</strong> on Tasky.</p>

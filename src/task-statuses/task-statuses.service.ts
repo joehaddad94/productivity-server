@@ -25,13 +25,17 @@ export type TaskStatusApi = {
 export class TaskStatusesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async assertMember(workspaceId: string, userId: string): Promise<void> {
+  private async assertMember(
+    workspaceId: string,
+    userId: string,
+  ): Promise<void> {
     const key = membershipKey(userId, workspaceId);
     if (membershipCache.get(key)) return;
     const membership = await this.prisma.workspaceMember.findUnique({
       where: { userId_workspaceId: { userId, workspaceId } },
     });
-    if (!membership) throw new ForbiddenException("You don't have access to this workspace");
+    if (!membership)
+      throw new ForbiddenException("You don't have access to this workspace");
     membershipCache.set(key, true);
   }
 
@@ -81,7 +85,10 @@ export class TaskStatusesService {
     });
   }
 
-  async list(workspaceId: string, userId: string): Promise<{ statuses: TaskStatusApi[] }> {
+  async list(
+    workspaceId: string,
+    userId: string,
+  ): Promise<{ statuses: TaskStatusApi[] }> {
     await this.assertMember(workspaceId, userId);
     await this.seedDefaultsForWorkspace(workspaceId);
     const rows = await this.prisma.workspaceTaskStatus.findMany({
@@ -119,7 +126,10 @@ export class TaskStatusesService {
       orderBy: { sortOrder: 'asc' },
       select: { id: true },
     });
-    if (!row) throw new BadRequestException('No open task status configured for workspace');
+    if (!row)
+      throw new BadRequestException(
+        'No open task status configured for workspace',
+      );
     return row.id;
   }
 
@@ -130,11 +140,17 @@ export class TaskStatusesService {
       orderBy: { sortOrder: 'asc' },
       select: { id: true },
     });
-    if (!row) throw new BadRequestException('No terminal task status configured for workspace');
+    if (!row)
+      throw new BadRequestException(
+        'No terminal task status configured for workspace',
+      );
     return row.id;
   }
 
-  async assertStatusInWorkspace(workspaceId: string, statusId: string): Promise<void> {
+  async assertStatusInWorkspace(
+    workspaceId: string,
+    statusId: string,
+  ): Promise<void> {
     const ok = await this.prisma.workspaceTaskStatus.findFirst({
       where: { id: statusId, workspaceId, archivedAt: null },
       select: { id: true },
@@ -176,7 +192,10 @@ export class TaskStatusesService {
   ): Promise<{ status: TaskStatusApi }> {
     const existing = await this.findById(workspaceId, statusId, userId);
 
-    if (dto.isTerminal !== undefined && dto.isTerminal !== existing.isTerminal) {
+    if (
+      dto.isTerminal !== undefined &&
+      dto.isTerminal !== existing.isTerminal
+    ) {
       if (dto.isTerminal === false) {
         const otherTerminal = await this.prisma.workspaceTaskStatus.count({
           where: {
@@ -187,7 +206,9 @@ export class TaskStatusesService {
           },
         });
         if (otherTerminal === 0) {
-          throw new BadRequestException('Workspace must keep at least one done-like status');
+          throw new BadRequestException(
+            'Workspace must keep at least one done-like status',
+          );
         }
       } else {
         const otherOpen = await this.prisma.workspaceTaskStatus.count({
@@ -199,7 +220,9 @@ export class TaskStatusesService {
           },
         });
         if (otherOpen === 0) {
-          throw new BadRequestException('Workspace must keep at least one non-terminal status');
+          throw new BadRequestException(
+            'Workspace must keep at least one non-terminal status',
+          );
         }
       }
     }
@@ -254,7 +277,9 @@ export class TaskStatusesService {
         );
       }
       if (replacementTaskStatusId === statusId) {
-        throw new BadRequestException('Replacement status must differ from the deleted one');
+        throw new BadRequestException(
+          'Replacement status must differ from the deleted one',
+        );
       }
       const replacement = await this.prisma.workspaceTaskStatus.findFirst({
         where: {
@@ -285,8 +310,12 @@ export class TaskStatusesService {
     await this.assertMember(workspaceId, userId);
 
     const [a, b] = await Promise.all([
-      this.prisma.workspaceTaskStatus.findFirst({ where: { id: idA, workspaceId } }),
-      this.prisma.workspaceTaskStatus.findFirst({ where: { id: idB, workspaceId } }),
+      this.prisma.workspaceTaskStatus.findFirst({
+        where: { id: idA, workspaceId },
+      }),
+      this.prisma.workspaceTaskStatus.findFirst({
+        where: { id: idB, workspaceId },
+      }),
     ]);
     if (!a || !b) throw new NotFoundException('One or both statuses not found');
 

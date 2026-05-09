@@ -1,5 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class QueryNoteDto {
@@ -27,12 +35,17 @@ export class QueryNoteDto {
   @IsUUID()
   projectId?: string;
 
-  @ApiPropertyOptional({ description: 'Filter notes linked to a specific task' })
+  @ApiPropertyOptional({
+    description: 'Filter notes linked to a specific task',
+  })
   @IsOptional()
   @IsUUID()
   taskId?: string;
 
-  @ApiPropertyOptional({ description: 'Max number of records to return (default 50)', default: 50 })
+  @ApiPropertyOptional({
+    description: 'Max number of records to return (default 50)',
+    default: 50,
+  })
   @IsOptional()
   @IsInt()
   @Min(1)
@@ -40,7 +53,10 @@ export class QueryNoteDto {
   @Type(() => Number)
   limit?: number;
 
-  @ApiPropertyOptional({ description: 'Number of records to skip (for pagination)', default: 0 })
+  @ApiPropertyOptional({
+    description: 'Number of records to skip (for pagination)',
+    default: 0,
+  })
   @IsOptional()
   @IsInt()
   @Min(0)

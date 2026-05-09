@@ -53,7 +53,9 @@ export class NotificationsService {
       webpush.setVapidDetails(subject, publicKey, privateKey);
       this.vapidConfigured = true;
     } else {
-      this.logger.warn('VAPID keys not configured — push notifications disabled');
+      this.logger.warn(
+        'VAPID keys not configured — push notifications disabled',
+      );
     }
   }
 
@@ -64,12 +66,18 @@ export class NotificationsService {
   // ── Settings ─────────────────────────────────────────────────────────────
 
   async getSettings(userId: string) {
-    const existing = await this.prisma.notificationSettings.findUnique({ where: { userId } });
+    const existing = await this.prisma.notificationSettings.findUnique({
+      where: { userId },
+    });
     if (existing) return existing;
     try {
-      return await this.prisma.notificationSettings.create({ data: { userId } });
+      return await this.prisma.notificationSettings.create({
+        data: { userId },
+      });
     } catch {
-      return this.prisma.notificationSettings.findUniqueOrThrow({ where: { userId } });
+      return this.prisma.notificationSettings.findUniqueOrThrow({
+        where: { userId },
+      });
     }
   }
 
@@ -92,7 +100,9 @@ export class NotificationsService {
   }
 
   async deletePushSubscription(userId: string, endpoint: string) {
-    await this.prisma.pushSubscription.deleteMany({ where: { userId, endpoint } });
+    await this.prisma.pushSubscription.deleteMany({
+      where: { userId, endpoint },
+    });
   }
 
   // ── Notification CRUD ─────────────────────────────────────────────────────
@@ -100,22 +110,35 @@ export class NotificationsService {
   async list(userId: string, workspaceId: string, skip = 0, take = 50) {
     const where = { userId, workspaceId };
     const [items, total] = await Promise.all([
-      this.prisma.notification.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take }),
+      this.prisma.notification.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
       this.prisma.notification.count({ where }),
     ]);
     return { items, total };
   }
 
   async unreadCount(userId: string, workspaceId: string): Promise<number> {
-    return this.prisma.notification.count({ where: { userId, workspaceId, read: false } });
+    return this.prisma.notification.count({
+      where: { userId, workspaceId, read: false },
+    });
   }
 
   async markRead(userId: string, id: string) {
-    return this.prisma.notification.updateMany({ where: { id, userId }, data: { read: true } });
+    return this.prisma.notification.updateMany({
+      where: { id, userId },
+      data: { read: true },
+    });
   }
 
   async markAllRead(userId: string, workspaceId: string) {
-    return this.prisma.notification.updateMany({ where: { userId, workspaceId, read: false }, data: { read: true } });
+    return this.prisma.notification.updateMany({
+      where: { userId, workspaceId, read: false },
+      data: { read: true },
+    });
   }
 
   async dismiss(userId: string, id: string) {
@@ -123,7 +146,9 @@ export class NotificationsService {
   }
 
   async dismissAll(userId: string, workspaceId: string) {
-    await this.prisma.notification.deleteMany({ where: { userId, workspaceId } });
+    await this.prisma.notification.deleteMany({
+      where: { userId, workspaceId },
+    });
   }
 
   // ── Delivery ──────────────────────────────────────────────────────────────
@@ -156,7 +181,11 @@ export class NotificationsService {
     }
 
     if (settings.email) {
-      await this.mail.sendNotificationEmail(params.userEmail, params.title, params.body);
+      await this.mail.sendNotificationEmail(
+        params.userEmail,
+        params.title,
+        params.body,
+      );
     }
 
     if (settings.push && this.vapidConfigured) {
@@ -166,27 +195,46 @@ export class NotificationsService {
         params.userTimezone,
       );
       if (!inQuiet) {
-        await this.sendPush(params.userId, params.title, params.body, params.url);
+        await this.sendPush(
+          params.userId,
+          params.title,
+          params.body,
+          params.url,
+        );
       }
     }
   }
 
-  private async sendPush(userId: string, title: string, body: string, url?: string) {
-    const subs = await this.prisma.pushSubscription.findMany({ where: { userId } });
+  private async sendPush(
+    userId: string,
+    title: string,
+    body: string,
+    url?: string,
+  ) {
+    const subs = await this.prisma.pushSubscription.findMany({
+      where: { userId },
+    });
     const payload = JSON.stringify({ title, body, url: url ?? '/dashboard' });
 
     for (const sub of subs) {
       try {
         await webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          {
+            endpoint: sub.endpoint,
+            keys: { p256dh: sub.p256dh, auth: sub.auth },
+          },
           payload,
         );
       } catch (err: unknown) {
         const status = (err as { statusCode?: number }).statusCode;
         if (status === 410 || status === 404) {
-          await this.prisma.pushSubscription.deleteMany({ where: { userId, endpoint: sub.endpoint } });
+          await this.prisma.pushSubscription.deleteMany({
+            where: { userId, endpoint: sub.endpoint },
+          });
         } else {
-          this.logger.error(`Push failed for ${userId}: ${err instanceof Error ? err.message : String(err)}`);
+          this.logger.error(
+            `Push failed for ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+          );
         }
       }
     }

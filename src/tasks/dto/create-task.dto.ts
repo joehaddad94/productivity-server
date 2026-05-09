@@ -49,7 +49,9 @@ export class CreateTaskDto {
   @IsEnum(TaskPriority)
   priority?: TaskPriority;
 
-  @ApiPropertyOptional({ description: 'Workspace task status id (UUID from task-statuses)' })
+  @ApiPropertyOptional({
+    description: 'Workspace task status id (UUID from task-statuses)',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(40)

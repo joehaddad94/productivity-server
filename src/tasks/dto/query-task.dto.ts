@@ -1,5 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { TaskPriority } from './create-task.dto';
 
@@ -15,12 +24,16 @@ export class QueryTaskDto {
   @IsEnum(TaskPriority)
   priority?: TaskPriority;
 
-  @ApiPropertyOptional({ description: 'ISO date — include tasks due before this date' })
+  @ApiPropertyOptional({
+    description: 'ISO date — include tasks due before this date',
+  })
   @IsOptional()
   @IsString()
   dueBefore?: string;
 
-  @ApiPropertyOptional({ description: 'ISO date — include tasks due after this date' })
+  @ApiPropertyOptional({
+    description: 'ISO date — include tasks due after this date',
+  })
   @IsOptional()
   @IsString()
   dueAfter?: string;
@@ -30,7 +43,10 @@ export class QueryTaskDto {
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ description: 'Max number of records to return (default 50, max 500)', default: 50 })
+  @ApiPropertyOptional({
+    description: 'Max number of records to return (default 50, max 500)',
+    default: 50,
+  })
   @IsOptional()
   @IsInt()
   @Min(1)
@@ -38,7 +54,10 @@ export class QueryTaskDto {
   @Type(() => Number)
   limit?: number;
 
-  @ApiPropertyOptional({ description: 'Number of records to skip (for pagination)', default: 0 })
+  @ApiPropertyOptional({
+    description: 'Number of records to skip (for pagination)',
+    default: 0,
+  })
   @IsOptional()
   @IsInt()
   @Min(0)

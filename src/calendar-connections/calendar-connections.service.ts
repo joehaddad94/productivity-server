@@ -54,13 +54,17 @@ export class CalendarConnectionsService {
       const payload = decoded.slice(0, lastColon);
       const sig = decoded.slice(lastColon + 1);
       const secret = this.config.getOrThrow<string>('JWT_SECRET');
-      const expected = createHmac('sha256', secret).update(payload).digest('hex');
+      const expected = createHmac('sha256', secret)
+        .update(payload)
+        .digest('hex');
       if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
         throw new Error('bad sig');
       }
       const [userId, tsStr] = payload.split(':');
       if (Date.now() - parseInt(tsStr, 10) > 10 * 60 * 1000) {
-        throw new BadRequestException('OAuth state expired — please try connecting again');
+        throw new BadRequestException(
+          'OAuth state expired — please try connecting again',
+        );
       }
       return userId;
     } catch (e) {
@@ -110,7 +114,9 @@ export class CalendarConnectionsService {
 
   async handleGoogleCallback(userId: string, code: string): Promise<void> {
     const clientId = this.config.get<string>('GOOGLE_CALENDAR_CLIENT_ID');
-    const clientSecret = this.config.get<string>('GOOGLE_CALENDAR_CLIENT_SECRET');
+    const clientSecret = this.config.get<string>(
+      'GOOGLE_CALENDAR_CLIENT_SECRET',
+    );
     const redirectUri = this.config.get<string>('GOOGLE_CALENDAR_REDIRECT_URI');
 
     const body = new URLSearchParams({
@@ -166,11 +172,14 @@ export class CalendarConnectionsService {
       scope: 'Calendars.Read offline_access',
     });
 
-    const res = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString(),
-    });
+    const res = await fetch(
+      'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+      },
+    );
 
     if (!res.ok) {
       const err = await res.text();
@@ -250,7 +259,14 @@ export class CalendarConnectionsService {
   // ─── Google events ────────────────────────────────────────────────────────
 
   private async fetchGoogleEvents(
-    conn: { id: string; provider: string; accessToken: string; refreshToken: string | null; expiresAt: Date | null; userId: string },
+    conn: {
+      id: string;
+      provider: string;
+      accessToken: string;
+      refreshToken: string | null;
+      expiresAt: Date | null;
+      userId: string;
+    },
     userId: string,
     start: string,
     end: string,
@@ -293,7 +309,13 @@ export class CalendarConnectionsService {
   }
 
   private async refreshGoogleTokenIfNeeded(
-    conn: { id: string; accessToken: string; refreshToken: string | null; expiresAt: Date | null; userId: string },
+    conn: {
+      id: string;
+      accessToken: string;
+      refreshToken: string | null;
+      expiresAt: Date | null;
+      userId: string;
+    },
     userId: string,
   ): Promise<string> {
     if (!conn.expiresAt || conn.expiresAt > new Date(Date.now() + 60_000)) {
@@ -302,7 +324,9 @@ export class CalendarConnectionsService {
     if (!conn.refreshToken) return conn.accessToken;
 
     const clientId = this.config.get<string>('GOOGLE_CALENDAR_CLIENT_ID');
-    const clientSecret = this.config.get<string>('GOOGLE_CALENDAR_CLIENT_SECRET');
+    const clientSecret = this.config.get<string>(
+      'GOOGLE_CALENDAR_CLIENT_SECRET',
+    );
 
     const body = new URLSearchParams({
       client_id: clientId!,
@@ -333,7 +357,14 @@ export class CalendarConnectionsService {
   // ─── Microsoft events ─────────────────────────────────────────────────────
 
   private async fetchMicrosoftEvents(
-    conn: { id: string; provider: string; accessToken: string; refreshToken: string | null; expiresAt: Date | null; userId: string },
+    conn: {
+      id: string;
+      provider: string;
+      accessToken: string;
+      refreshToken: string | null;
+      expiresAt: Date | null;
+      userId: string;
+    },
     userId: string,
     start: string,
     end: string,
@@ -377,7 +408,13 @@ export class CalendarConnectionsService {
   }
 
   private async refreshMicrosoftTokenIfNeeded(
-    conn: { id: string; accessToken: string; refreshToken: string | null; expiresAt: Date | null; userId: string },
+    conn: {
+      id: string;
+      accessToken: string;
+      refreshToken: string | null;
+      expiresAt: Date | null;
+      userId: string;
+    },
     userId: string,
   ): Promise<string> {
     if (!conn.expiresAt || conn.expiresAt > new Date(Date.now() + 60_000)) {

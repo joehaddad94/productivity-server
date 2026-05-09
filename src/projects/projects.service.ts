@@ -16,13 +16,17 @@ type ProjectWithCount = Project & { _count: { notes: number; tasks: number } };
 export class ProjectsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async assertMember(workspaceId: string, userId: string): Promise<void> {
+  private async assertMember(
+    workspaceId: string,
+    userId: string,
+  ): Promise<void> {
     const key = membershipKey(userId, workspaceId);
     if (membershipCache.get(key)) return;
     const membership = await this.prisma.workspaceMember.findUnique({
       where: { userId_workspaceId: { userId, workspaceId } },
     });
-    if (!membership) throw new ForbiddenException("You don't have access to this workspace");
+    if (!membership)
+      throw new ForbiddenException("You don't have access to this workspace");
     membershipCache.set(key, true);
   }
 
@@ -51,7 +55,11 @@ export class ProjectsService {
     return { projects: projects as ProjectWithCount[], total };
   }
 
-  async create(workspaceId: string, userId: string, dto: CreateProjectDto): Promise<Project> {
+  async create(
+    workspaceId: string,
+    userId: string,
+    dto: CreateProjectDto,
+  ): Promise<Project> {
     await this.assertMember(workspaceId, userId);
 
     return this.prisma.project.create({
@@ -65,7 +73,11 @@ export class ProjectsService {
     });
   }
 
-  async findOne(workspaceId: string, id: string, userId: string): Promise<ProjectWithCount> {
+  async findOne(
+    workspaceId: string,
+    id: string,
+    userId: string,
+  ): Promise<ProjectWithCount> {
     await this.assertMember(workspaceId, userId);
 
     const project = await this.prisma.project.findFirst({
@@ -88,7 +100,9 @@ export class ProjectsService {
       where: { id },
       data: {
         ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
-        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.description !== undefined
+          ? { description: dto.description }
+          : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.color !== undefined ? { color: dto.color } : {}),
       },

@@ -1,4 +1,8 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Workspace } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -51,7 +55,7 @@ describe('WorkspacesService', () => {
     }).compile();
 
     service = module.get<WorkspacesService>(WorkspacesService);
-    prisma = module.get(PrismaService) as typeof mockPrisma;
+    prisma = module.get(PrismaService);
     jest.clearAllMocks();
   });
 
@@ -83,8 +87,9 @@ describe('WorkspacesService', () => {
     it('derives slug from name when slug is omitted', async () => {
       prisma.workspaceMember.findMany.mockResolvedValue([]);
       prisma.workspace.findFirst.mockResolvedValue(null);
-      prisma.workspace.create.mockImplementation((args: { data: { slug: string } }) =>
-        Promise.resolve({ ...mockWorkspace, slug: args.data.slug }),
+      prisma.workspace.create.mockImplementation(
+        (args: { data: { slug: string } }) =>
+          Promise.resolve({ ...mockWorkspace, slug: args.data.slug }),
       );
       prisma.workspaceMember.create.mockResolvedValue({} as never);
 
@@ -169,8 +174,9 @@ describe('WorkspacesService', () => {
       prisma.workspace.findFirst
         .mockResolvedValueOnce({ id: 'other-ws' })
         .mockResolvedValueOnce(null);
-      prisma.workspace.create.mockImplementation((args: { data: { slug: string } }) =>
-        Promise.resolve({ ...mockWorkspace, slug: args.data.slug }),
+      prisma.workspace.create.mockImplementation(
+        (args: { data: { slug: string } }) =>
+          Promise.resolve({ ...mockWorkspace, slug: args.data.slug }),
       );
       prisma.workspaceMember.create.mockResolvedValue({} as never);
 
@@ -250,11 +256,9 @@ describe('WorkspacesService', () => {
         name: 'Updated Name',
       });
 
-      const result = await service.update(
-        'ws-1',
-        'user-1',
-        { name: 'Updated Name' },
-      );
+      const result = await service.update('ws-1', 'user-1', {
+        name: 'Updated Name',
+      });
 
       expect(result.name).toBe('Updated Name');
       expect(prisma.workspace.update).toHaveBeenCalledWith({
@@ -280,8 +284,9 @@ describe('WorkspacesService', () => {
       prisma.workspace.findFirst
         .mockResolvedValueOnce({ id: 'other-ws' })
         .mockResolvedValueOnce(null);
-      prisma.workspace.update.mockImplementation((args: { data: { slug: string } }) =>
-        Promise.resolve({ ...mockWorkspace, slug: args.data.slug }),
+      prisma.workspace.update.mockImplementation(
+        (args: { data: { slug: string } }) =>
+          Promise.resolve({ ...mockWorkspace, slug: args.data.slug }),
       );
 
       await service.update('ws-1', 'user-1', { slug: 'taken' });
