@@ -13,6 +13,7 @@ import { MailService } from '../mail/mail.service';
 import { SessionService } from './services/session.service';
 import { MagicLinkService } from './services/magic-link.service';
 import type { AuthResult, MagicLinkMessageResult } from './types/auth.types';
+import { sessionCache } from './strategies/jwt.strategy';
 
 /** Simple in-memory rate limiter: max 3 magic link requests per email per 10 minutes. */
 class MagicLinkRateLimiter {
@@ -83,6 +84,7 @@ export class AuthService {
   }
 
   async logout(sessionId: string): Promise<void> {
+    sessionCache.delete(sessionId);
     await this.sessionService.revokeSession(sessionId);
   }
 
