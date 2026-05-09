@@ -15,31 +15,19 @@
       {
         "name": "service",
         "type": "query",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "__PROM_UID__"
-        },
-        "query": "label_values(http_server_request_duration_seconds_count, service_name)",
-        "current": {
-          "text": "__SERVICE_NAME__",
-          "value": "__SERVICE_NAME__"
-        },
+        "datasource": { "type": "prometheus", "uid": "__PROM_UID__" },
+        "query": "label_values(http_server_duration_milliseconds_count, service_name)",
+        "current": { "text": "__SERVICE_NAME__", "value": "__SERVICE_NAME__" },
         "refresh": 2
       },
       {
         "name": "route",
         "type": "query",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "__PROM_UID__"
-        },
-        "query": "label_values(http_server_request_duration_seconds_count{service_name=\"$service\"}, http_route)",
+        "datasource": { "type": "prometheus", "uid": "__PROM_UID__" },
+        "query": "label_values(http_server_duration_milliseconds_count{service_name=\"$service\"}, http_route)",
         "includeAll": true,
         "allValue": ".*",
-        "current": {
-          "text": "All",
-          "value": ".*"
-        },
+        "current": { "text": "All", "value": ".*" },
         "refresh": 2
       }
     ]
@@ -49,152 +37,133 @@
       "id": 1,
       "type": "stat",
       "title": "Request Rate (RPS)",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "__PROM_UID__"
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 0,
-        "y": 0
-      },
+      "datasource": { "type": "prometheus", "uid": "__PROM_UID__" },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval]))"
+          "expr": "sum(rate(http_server_duration_milliseconds_count{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval]))"
         }
       ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
       "options": {
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        }
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
       }
     },
     {
       "id": 2,
       "type": "stat",
       "title": "Error Rate (%)",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "__PROM_UID__"
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 6,
-        "y": 0
-      },
+      "datasource": { "type": "prometheus", "uid": "__PROM_UID__" },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * sum(rate(http_server_request_duration_seconds_count{service_name=\"$service\", http_route=~\"$route\", http_response_status_code=~\"5..\"}[$__rate_interval])) / clamp_min(sum(rate(http_server_request_duration_seconds_count{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval])), 1e-9)"
+          "expr": "100 * sum(rate(http_server_duration_milliseconds_count{service_name=\"$service\", http_route=~\"$route\", http_status_code=~\"5..\"}[$__rate_interval])) / clamp_min(sum(rate(http_server_duration_milliseconds_count{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval])), 1e-9)"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percent"
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
         }
       },
       "options": {
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        }
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
       }
     },
     {
       "id": 3,
       "type": "stat",
       "title": "P95 Latency",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "__PROM_UID__"
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 12,
-        "y": 0
-      },
+      "datasource": { "type": "prometheus", "uid": "__PROM_UID__" },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval])) by (le))"
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval])) by (le))"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s"
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 500 },
+              { "color": "red", "value": 1000 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
         }
       },
       "options": {
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        }
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
       }
     },
     {
       "id": 4,
       "type": "stat",
       "title": "P99 Latency",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "__PROM_UID__"
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 18,
-        "y": 0
-      },
+      "datasource": { "type": "prometheus", "uid": "__PROM_UID__" },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval])) by (le))"
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_duration_milliseconds_bucket{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval])) by (le))"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s"
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1000 },
+              { "color": "red", "value": 2000 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
         }
       },
       "options": {
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        }
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
       }
     },
     {
       "id": 5,
       "type": "timeseries",
       "title": "Latency by Route (P95)",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "__PROM_UID__"
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 0,
-        "y": 5
-      },
+      "datasource": { "type": "prometheus", "uid": "__PROM_UID__" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 5 },
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval])) by (le, http_route))"
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval])) by (le, http_route))",
+          "legendFormat": "{{http_route}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s"
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 500 },
+              { "color": "red", "value": 1000 }
+            ]
+          }
         }
       }
     },
@@ -202,25 +171,26 @@
       "id": 6,
       "type": "timeseries",
       "title": "Error Rate by Route",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "__PROM_UID__"
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 12,
-        "y": 5
-      },
+      "datasource": { "type": "prometheus", "uid": "__PROM_UID__" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 5 },
       "targets": [
         {
           "refId": "A",
-          "expr": "100 * sum(rate(http_server_request_duration_seconds_count{service_name=\"$service\", http_route=~\"$route\", http_response_status_code=~\"5..\"}[$__rate_interval])) by (http_route) / clamp_min(sum(rate(http_server_request_duration_seconds_count{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval])) by (http_route), 1e-9)"
+          "expr": "100 * sum(rate(http_server_duration_milliseconds_count{service_name=\"$service\", http_route=~\"$route\", http_status_code=~\"5..\"}[$__rate_interval])) by (http_route) / clamp_min(sum(rate(http_server_duration_milliseconds_count{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval])) by (http_route), 1e-9)",
+          "legendFormat": "{{http_route}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percent"
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
         }
       }
     },
@@ -228,45 +198,192 @@
       "id": 7,
       "type": "timeseries",
       "title": "Throughput by Route (RPS)",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "__PROM_UID__"
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 0,
-        "y": 14
-      },
+      "datasource": { "type": "prometheus", "uid": "__PROM_UID__" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 14 },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval])) by (http_route)"
+          "expr": "sum(rate(http_server_duration_milliseconds_count{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval])) by (http_route)",
+          "legendFormat": "{{http_route}}"
         }
-      }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
     },
     {
       "id": 8,
       "type": "table",
       "title": "Slowest Routes (avg latency)",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "__PROM_UID__"
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 12,
-        "y": 14
-      },
+      "datasource": { "type": "prometheus", "uid": "__PROM_UID__" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 14 },
       "targets": [
         {
           "refId": "A",
           "format": "table",
           "instant": true,
-          "expr": "topk(10, (sum(rate(http_server_request_duration_seconds_sum{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval])) by (http_route)) / clamp_min(sum(rate(http_server_request_duration_seconds_count{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval])) by (http_route), 1e-9))"
+          "expr": "topk(10, (sum(rate(http_server_duration_milliseconds_sum{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval])) by (http_route)) / clamp_min(sum(rate(http_server_duration_milliseconds_count{service_name=\"$service\", http_route=~\"$route\"}[$__rate_interval])) by (http_route), 1e-9))",
+          "legendFormat": "{{http_route}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 500 },
+              { "color": "red", "value": 1000 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "http_route": "Route",
+              "Value": "Avg Latency"
+            },
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "job": true,
+              "service_name": true,
+              "service_namespace": true,
+              "deployment_environment": true
+            }
+          }
         }
       ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "DB Query Duration (P95 by operation)",
+      "datasource": { "type": "prometheus", "uid": "__PROM_UID__" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 23 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum(rate(db_client_operation_duration_seconds_bucket{service_name=\"$service\"}[$__rate_interval])) by (le, db_operation_name))",
+          "legendFormat": "{{db_operation_name}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Event Loop Utilization",
+      "datasource": { "type": "prometheus", "uid": "__PROM_UID__" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 23 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nodejs_eventloop_utilization_ratio{service_name=\"$service\"}",
+          "legendFormat": "utilization"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "red", "value": 0.8 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Heap Memory Used vs Limit",
+      "datasource": { "type": "prometheus", "uid": "__PROM_UID__" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(v8js_memory_heap_used_bytes{service_name=\"$service\"})",
+          "legendFormat": "Used"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(v8js_memory_heap_limit_bytes{service_name=\"$service\"})",
+          "legendFormat": "Limit"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "DB Connection Pool",
+      "datasource": { "type": "prometheus", "uid": "__PROM_UID__" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 32 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(db_client_connection_count{service_name=\"$service\"}) by (db_client_connection_state)",
+          "legendFormat": "{{db_client_connection_state}}"
+        },
+        {
+          "refId": "B",
+          "expr": "db_client_connection_pending_requests{service_name=\"$service\"}",
+          "legendFormat": "pending requests"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "pending requests" },
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 5 },
+                    { "color": "red", "value": 10 }
+                  ]
+                }
+              },
+              { "id": "color", "value": { "mode": "thresholds" } }
+            ]
+          }
+        ]
+      }
     }
   ]
 }
