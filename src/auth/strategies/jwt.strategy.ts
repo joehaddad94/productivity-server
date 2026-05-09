@@ -17,7 +17,9 @@ interface JwtPayload {
 
 function jwtFromCookieOrHeader(cookieName: string) {
   return (req: Request): string | null => {
-    const fromCookie = req?.cookies?.[cookieName];
+    const fromCookie = (req?.cookies as Record<string, string> | undefined)?.[
+      cookieName
+    ];
     if (fromCookie) return fromCookie;
     return ExtractJwt.fromAuthHeaderAsBearerToken()(req);
   };

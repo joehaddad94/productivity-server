@@ -42,7 +42,7 @@ export class AuthController {
 
   private setAuthCookie(res: Response, accessToken: string): void {
     const expiresIn =
-      this.config.get(AUTH_CONFIG.JWT_EXPIRES_IN) ??
+      this.config.get<string>(AUTH_CONFIG.JWT_EXPIRES_IN) ??
       AUTH_CONFIG.JWT_EXPIRES_IN_DEFAULT;
     const maxAgeSec = parseExpiresInToSeconds(expiresIn);
     const isProduction = this.config.get('NODE_ENV') === 'production';
@@ -158,7 +158,9 @@ export class AuthController {
     const result = await this.authService.verifyMagicLink(token);
     this.setAuthCookie(res, result.accessToken);
 
-    const redirectUrl = this.config.get(AUTH_CONFIG.VERIFY_REDIRECT_URL);
+    const redirectUrl = this.config.get<string>(
+      AUTH_CONFIG.VERIFY_REDIRECT_URL,
+    );
     if (redirectUrl) {
       res.redirect(302, redirectUrl);
       return undefined as unknown as AuthResponseDto;

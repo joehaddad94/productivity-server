@@ -258,10 +258,10 @@ export class TasksService {
     task: Task,
     workspaceId: string,
   ): Promise<void> {
-    const rule = (task as any).recurrenceRule as RecurrenceRule | null;
-    if (!rule || !(task as any).dueDate) return;
+    const rule = task.recurrenceRule as RecurrenceRule | null;
+    if (!rule || !task.dueDate) return;
 
-    const currentDue = new Date((task as any).dueDate as Date);
+    const currentDue = new Date(task.dueDate);
     let nextDue: Date;
 
     if (rule === RecurrenceRule.DAILY) {
@@ -281,15 +281,15 @@ export class TasksService {
     await this.prisma.task.create({
       data: {
         workspaceId,
-        title: (task as any).title,
-        description: (task as any).description,
+        title: task.title,
+        description: task.description,
         dueDate: nextDue,
-        dueTime: (task as any).dueTime,
-        priority: (task as any).priority,
+        dueTime: task.dueTime,
+        priority: task.priority,
         status: openStatusId,
         recurrenceRule: rule,
         recurrenceParentId: task.id,
-        sortOrder: (task as any).sortOrder ?? 0,
+        sortOrder: task.sortOrder ?? 0,
       },
     });
   }

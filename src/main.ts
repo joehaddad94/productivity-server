@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
 import { trace } from '@opentelemetry/api';
+import type { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
 
 function normalizeRoute(url: string): string {
@@ -20,7 +21,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const httpLogger = new Logger('HTTP');
 
-  app.use((req: any, res: any, next: () => void) => {
+  app.use((req: Request, res: Response, next: NextFunction) => {
     const { method, url } = req;
     const start = Date.now();
     res.on('finish', () => {
@@ -81,4 +82,4 @@ async function bootstrap() {
     span.end();
   }
 }
-bootstrap();
+void bootstrap();

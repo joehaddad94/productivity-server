@@ -78,7 +78,7 @@ export class NotificationsScheduler {
       const agendaHour = parseHour(settings.dailyAgendaTime ?? '08:00');
 
       if (localHour === agendaHour) {
-        await this.runDailyAgenda(member, settings);
+        await this.runDailyAgenda(member);
       }
       if (localHour === 9) {
         await this.runOverdueCheck(member);
@@ -89,14 +89,11 @@ export class NotificationsScheduler {
     }
   }
 
-  private async runDailyAgenda(
-    member: {
-      userId: string;
-      workspaceId: string;
-      user: { email: string; timezone: string | null };
-    },
-    settings: { inApp: boolean; email: boolean; push: boolean },
-  ) {
+  private async runDailyAgenda(member: {
+    userId: string;
+    workspaceId: string;
+    user: { email: string; timezone: string | null };
+  }) {
     const { today, tomorrow } = getLocalDayBoundaries(member.user.timezone);
 
     // Dedup: skip if daily_agenda already sent today for this user/workspace

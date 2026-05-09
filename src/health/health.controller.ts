@@ -1,9 +1,4 @@
-import {
-  Controller,
-  Get,
-  Logger,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Controller, Get, Logger } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -18,7 +13,7 @@ export class HealthController {
   @ApiOperation({ summary: 'Health check (includes DB connectivity)' })
   @ApiResponse({ status: 200, description: 'App and database are healthy' })
   @ApiResponse({ status: 503, description: 'Database unreachable' })
-  async check() {
+  check() {
     return { status: 'ok' };
   }
 }
