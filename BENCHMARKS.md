@@ -68,3 +68,39 @@ Cache hit skips both DB round-trips. Logout calls `sessionCache.delete(jti)` imm
 - JWT guard overhead eliminated on cache hits: ~550ms → ~0ms per authenticated request.
 - Remaining latency is pure DB query cost against remote Supabase.
 - List endpoints (`/tasks` 1.6s, `/notes` 1.3s, `/projects` 1.4s) are next to investigate — likely heavy joins or missing indexes.
+
+---
+
+## 2026-05-10 — After membership cache + composite indexes + notifications fix
+
+Changes:
+1. `assertMember()` now checks `membershipCache` (60s TTL, max 5000) before firing `workspaceMember.findUnique`.  
+2. Added composite indexes: `(workspaceId, deletedAt)` on Task and Project; `(workspaceId, updatedAt)` on Note.  
+3. `getSettings()` uses `findUnique` first, only `create` on miss (eliminates upsert write-amplification).
+
+| Endpoint | Min | P50 | Avg | Max | vs 2026-05-10 |
+|---|---:|---:|---:|---:|---:|
+| `GET /health` | 1ms | 2ms | 2ms | 3ms | — |
+| `GET /auth/me` | 2ms | 4ms | 4ms | 7ms | **-18ms** |
+| `GET /notifications/vapid-public-key` | 2ms | 3ms | 4ms | 7ms | **-18ms** |
+| `GET /workspaces/:id/notifications/unread-count` | 256ms | 263ms | 266ms | 277ms | **-14ms** |
+| `GET /workspaces` | 515ms | 524ms | 523ms | 529ms | -26ms |
+| `GET /workspaces/:id` | 505ms | 511ms | 517ms | 540ms | **-20ms** |
+| `GET /calendar-connections` | 254ms | 268ms | 267ms | 285ms | **-17ms** |
+| `GET /workspaces/:id/members` | 774ms | 780ms | 789ms | 822ms | **-544ms** |
+| `GET /workspaces/:id/task-statuses` | 507ms | 511ms | 516ms | 543ms | **-280ms** |
+| `GET /workspaces/:id/tags` | 251ms | 252ms | 260ms | 281ms | **-1062ms** |
+| `GET /workspaces/:id/analytics` | 509ms | 559ms | 571ms | 660ms | **-236ms** |
+| `GET /notifications/settings` | 258ms | 259ms | 261ms | 270ms | **-1061ms** |
+| `GET /workspaces/:id/notes` | 1008ms | 1039ms | 1043ms | 1083ms | **-257ms** |
+| `GET /workspaces/:id/projects` | 1009ms | 1037ms | 1073ms | 1193ms | **-339ms** |
+| `GET /workspaces/:id/notifications` | 1019ms | 1053ms | 1157ms | 1609ms | -19ms |
+| `GET /workspaces/:id/tasks` | 1322ms | 1342ms | 1344ms | 1383ms | **-245ms** |
+| `GET /workspaces/:id/notes/:id` | 252ms | 254ms | 254ms | 257ms | **-822ms** |
+
+### Observations
+
+- Membership cache hit eliminates 1 DB round-trip (~250–300ms) per workspace request. Most notable wins: `/tags` -1062ms, `/notifications/settings` -1061ms, `/task-statuses` -280ms.
+- Composite indexes on `(workspaceId, deletedAt)` reduce task/project list scans; list endpoints now 1.0–1.3s.
+- `GET /workspaces/:id/notifications` (1.0–1.6s) is the next bottleneck — wide join across notifications + users.
+- `GET /workspaces` and `GET /workspaces/:id` still ~520ms — pure DB cost fetching workspace rows; no obvious further optimization without read replicas or app-level workspace cache.

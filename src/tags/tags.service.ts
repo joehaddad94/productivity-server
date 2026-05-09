@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, Note } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { membershipCache, membershipKey } from '../common/membership-cache';
 
 const MAX_TAG_LENGTH = 40;
 
@@ -22,12 +23,13 @@ export class TagsService {
   constructor(private readonly prisma: PrismaService) {}
 
   private async assertMember(workspaceId: string, userId: string): Promise<void> {
+    const key = membershipKey(userId, workspaceId);
+    if (membershipCache.get(key)) return;
     const membership = await this.prisma.workspaceMember.findUnique({
       where: { userId_workspaceId: { userId, workspaceId } },
     });
-    if (!membership) {
-      throw new ForbiddenException("You don't have access to this workspace");
-    }
+    if (!membership) throw new ForbiddenException("You don't have access to this workspace");
+    membershipCache.set(key, true);
   }
 
   /** Trim, lowercase, strip empty, enforce length, dedup while preserving order. */

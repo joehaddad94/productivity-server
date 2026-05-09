@@ -64,11 +64,9 @@ export class NotificationsService {
   // ── Settings ─────────────────────────────────────────────────────────────
 
   async getSettings(userId: string) {
-    return this.prisma.notificationSettings.upsert({
-      where: { userId },
-      create: { userId },
-      update: {},
-    });
+    const existing = await this.prisma.notificationSettings.findUnique({ where: { userId } });
+    if (existing) return existing;
+    return this.prisma.notificationSettings.create({ data: { userId } });
   }
 
   async updateSettings(userId: string, dto: UpdateNotificationSettingsDto) {

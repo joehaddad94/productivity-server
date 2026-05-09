@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { membershipCache, membershipKey } from '../common/membership-cache';
 import { MailService } from '../mail/mail.service';
 import { TaskStatusesService } from '../task-statuses/task-statuses.service';
 import { ConfigService } from '@nestjs/config';
@@ -230,6 +231,7 @@ export class WorkspacesService {
     await this.prisma.workspaceMember.delete({
       where: { userId_workspaceId: { userId: targetUserId, workspaceId } },
     });
+    membershipCache.delete(membershipKey(targetUserId, workspaceId));
   }
 
   async updateMemberRole(

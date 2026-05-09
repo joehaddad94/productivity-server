@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { membershipCache, membershipKey } from '../common/membership-cache';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Task } from '@prisma/client';
@@ -25,12 +26,13 @@ export class TasksService {
   ) {}
 
   private async assertMember(workspaceId: string, userId: string): Promise<void> {
+    const key = membershipKey(userId, workspaceId);
+    if (membershipCache.get(key)) return;
     const membership = await this.prisma.workspaceMember.findUnique({
       where: { userId_workspaceId: { userId, workspaceId } },
     });
-    if (!membership) {
-      throw new ForbiddenException("You don't have access to this workspace");
-    }
+    if (!membership) throw new ForbiddenException("You don't have access to this workspace");
+    membershipCache.set(key, true);
   }
 
   async list(
