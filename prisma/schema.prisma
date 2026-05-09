@@ -230,7 +230,7 @@ model Notification {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  @@index([userId, workspaceId])
+  @@index([userId, workspaceId, createdAt(sort: Desc)])
   @@index([userId, read])
   @@map("notifications")
 }

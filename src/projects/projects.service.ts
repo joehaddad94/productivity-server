@@ -37,7 +37,7 @@ export class ProjectsService {
     const skip = query.skip ?? 0;
     const where = { workspaceId, deletedAt: null };
 
-    const [projects, total] = await this.prisma.$transaction([
+    const [projects, total] = await Promise.all([
       this.prisma.project.findMany({
         where,
         include: { _count: { select: { notes: true, tasks: true } } },

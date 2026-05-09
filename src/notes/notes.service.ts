@@ -59,7 +59,7 @@ export class NotesService {
     const limit = query.limit ?? 50;
     const skip = query.skip ?? 0;
 
-    const [notes, total] = await this.prisma.$transaction([
+    const [notes, total] = await Promise.all([
       this.prisma.note.findMany({ where, orderBy: { updatedAt: 'desc' }, take: limit, skip }),
       this.prisma.note.count({ where }),
     ]);

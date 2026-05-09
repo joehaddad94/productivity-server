@@ -104,3 +104,38 @@ Changes:
 - Composite indexes on `(workspaceId, deletedAt)` reduce task/project list scans; list endpoints now 1.0–1.3s.
 - `GET /workspaces/:id/notifications` (1.0–1.6s) is the next bottleneck — wide join across notifications + users.
 - `GET /workspaces` and `GET /workspaces/:id` still ~520ms — pure DB cost fetching workspace rows; no obvious further optimization without read replicas or app-level workspace cache.
+
+---
+
+## 2026-05-10 — After parallel reads + notes content exclusion
+
+Changes:
+1. All list endpoints: replaced `prisma.$transaction([findMany, count])` with `Promise.all([findMany, count])` — queries fire concurrently instead of sequentially.
+2. Notes list: added `select` excluding the `content` field (only loaded in the editor, not the list view).
+
+| Endpoint | Min | P50 | Avg | Max | vs prev |
+|---|---:|---:|---:|---:|---:|
+| `GET /health` | 2ms | 2ms | 2ms | 3ms | — |
+| `GET /auth/me` | 3ms | 3ms | 3ms | 4ms | — |
+| `GET /notifications/vapid-public-key` | 2ms | 2ms | 2ms | 3ms | — |
+| `GET /workspaces/:id/notifications/unread-count` | 260ms | 269ms | 275ms | 302ms | — |
+| `GET /workspaces` | 514ms | 529ms | 531ms | 548ms | — |
+| `GET /workspaces/:id` | 518ms | 528ms | 540ms | 570ms | — |
+| `GET /calendar-connections` | 259ms | 260ms | 260ms | 264ms | — |
+| `GET /workspaces/:id/members` | 763ms | 776ms | 785ms | 812ms | — |
+| `GET /workspaces/:id/task-statuses` | 503ms | 511ms | 516ms | 539ms | — |
+| `GET /workspaces/:id/tags` | 251ms | 252ms | 262ms | 300ms | — |
+| `GET /workspaces/:id/analytics` | 505ms | 512ms | 522ms | 556ms | **-49ms** |
+| `GET /workspaces/:id/notifications` | 1028ms | 1075ms | 1171ms | 1612ms | — |
+| `GET /workspaces/:id/notes` | 257ms | 260ms | 260ms | 266ms | **-783ms** |
+| `GET /workspaces/:id/projects` | 256ms | 262ms | 264ms | 279ms | **-809ms** |
+| `GET /notifications/settings` | 256ms | 270ms | 280ms | 337ms | — |
+| `GET /workspaces/:id/tasks` | 512ms | 517ms | 526ms | 563ms | **-818ms** |
+| `GET /workspaces/:id/notes/:id` | 254ms | 259ms | 258ms | 259ms | — |
+
+### Observations
+
+- Parallelising findMany + count eliminated one full DB round-trip (~250ms) from every list endpoint.
+- `/tasks` dropped from 1344ms → 526ms (**-818ms**), `/notes` from 1043ms → 260ms (**-783ms**), `/projects` from 1073ms → 264ms (**-809ms**).
+- All list endpoints now sit at ~260ms (1 round-trip) or ~530ms (2 round-trips). The floor is remote Supabase latency.
+- Remaining outlier: `GET /workspaces/:id/notifications` still ~1.1s — heavier join. Everything else is at or near the network floor.

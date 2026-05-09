@@ -66,7 +66,11 @@ export class NotificationsService {
   async getSettings(userId: string) {
     const existing = await this.prisma.notificationSettings.findUnique({ where: { userId } });
     if (existing) return existing;
-    return this.prisma.notificationSettings.create({ data: { userId } });
+    try {
+      return await this.prisma.notificationSettings.create({ data: { userId } });
+    } catch {
+      return this.prisma.notificationSettings.findUniqueOrThrow({ where: { userId } });
+    }
   }
 
   async updateSettings(userId: string, dto: UpdateNotificationSettingsDto) {
@@ -94,14 +98,10 @@ export class NotificationsService {
   // ── Notification CRUD ─────────────────────────────────────────────────────
 
   async list(userId: string, workspaceId: string, skip = 0, take = 50) {
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.notification.findMany({
-        where: { userId, workspaceId },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take,
-      }),
-      this.prisma.notification.count({ where: { userId, workspaceId } }),
+    const where = { userId, workspaceId };
+    const [items, total] = await Promise.all([
+      this.prisma.notification.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take }),
+      this.prisma.notification.count({ where }),
     ]);
     return { items, total };
   }

@@ -70,7 +70,7 @@ export class TasksService {
     const limit = query.limit ?? 50;
     const skip = query.skip ?? 0;
 
-    const [tasks, total] = await this.prisma.$transaction([
+    const [tasks, total] = await Promise.all([
       this.prisma.task.findMany({
         where,
         include: {
