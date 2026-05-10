@@ -114,7 +114,7 @@ describe('AuthService', () => {
       magicLinkService.createMagicLink.mockResolvedValue({
         magicLink: 'http://localhost/auth/verify?token=x',
       });
-      mailService.sendMagicLinkEmail.mockResolvedValue(false);
+      mailService.sendMagicLinkEmail.mockResolvedValue(true);
 
       await service.register({
         email: '  UPPER@Example.COM  ',
@@ -127,19 +127,16 @@ describe('AuthService', () => {
       );
     });
 
-    it('returns magicLink in response when SMTP does not send (dev mode)', async () => {
+    it('throws ServiceUnavailableException when SMTP fails to send', async () => {
       usersService.findByEmail.mockResolvedValue(null);
       magicLinkService.createMagicLink.mockResolvedValue({
         magicLink: 'http://localhost/verify?token=dev',
       });
       mailService.sendMagicLinkEmail.mockResolvedValue(false);
 
-      const result = await service.register({
-        email: 'dev@example.com',
-      });
-
-      expect(result.magicLink).toBe('http://localhost/verify?token=dev');
-      expect(result.message).toContain('Use the link below in dev');
+      await expect(
+        service.register({ email: 'dev@example.com' }),
+      ).rejects.toThrow('Failed to send verification email');
     });
   });
 
@@ -287,6 +284,7 @@ describe('AuthService', () => {
         id: 'user-new',
         email: 'new@example.com',
         name: 'New Name',
+        isAdmin: false,
       });
       expect(result.accessToken).toBe('jwt-token');
     });
@@ -312,6 +310,7 @@ describe('AuthService', () => {
         id: 'user-1',
         email: 'user@example.com',
         name: 'Jane',
+        isAdmin: false,
       });
       expect(result.accessToken).toBe('jwt-existing');
     });

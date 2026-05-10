@@ -5,7 +5,10 @@ import {
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Workspace } from '@prisma/client';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
+import { TaskStatusesService } from '../task-statuses/task-statuses.service';
 import { WorkspacesService } from './workspaces.service';
 
 describe('WorkspacesService', () => {
@@ -15,20 +18,22 @@ describe('WorkspacesService', () => {
       findFirst: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
-      delete: jest.Mock;
     };
     workspaceMember: {
       findMany: jest.Mock;
+      findFirst: jest.Mock;
       findUnique: jest.Mock;
       create: jest.Mock;
     };
   };
+  let taskStatuses: { seedDefaultsForWorkspace: jest.Mock };
 
   const mockWorkspace: Workspace = {
     id: 'ws-1',
     name: 'My Workspace',
     slug: 'my-workspace',
     isPersonal: false,
+    deletedAt: null,
     createdAt: new Date(),
   };
 
@@ -38,24 +43,30 @@ describe('WorkspacesService', () => {
         findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
-        delete: jest.fn(),
       },
       workspaceMember: {
         findMany: jest.fn(),
+        findFirst: jest.fn(),
         findUnique: jest.fn(),
         create: jest.fn(),
       },
     };
 
+    const mockTaskStatuses = { seedDefaultsForWorkspace: jest.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WorkspacesService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: MailService, useValue: { sendInviteEmail: jest.fn() } },
+        { provide: ConfigService, useValue: { get: jest.fn() } },
+        { provide: TaskStatusesService, useValue: mockTaskStatuses },
       ],
     }).compile();
 
     service = module.get<WorkspacesService>(WorkspacesService);
     prisma = module.get(PrismaService);
+    taskStatuses = module.get(TaskStatusesService);
     jest.clearAllMocks();
   });
 
@@ -65,6 +76,7 @@ describe('WorkspacesService', () => {
       prisma.workspace.findFirst.mockResolvedValue(null);
       prisma.workspace.create.mockResolvedValue(mockWorkspace);
       prisma.workspaceMember.create.mockResolvedValue({} as never);
+      taskStatuses.seedDefaultsForWorkspace.mockResolvedValue(undefined);
 
       const result = await service.create(
         { name: 'My Workspace', slug: 'my-workspace' },
@@ -82,6 +94,7 @@ describe('WorkspacesService', () => {
       expect(prisma.workspaceMember.create).toHaveBeenCalledWith({
         data: { userId: 'user-1', workspaceId: 'ws-1', role: 'owner' },
       });
+      expect(taskStatuses.seedDefaultsForWorkspace).toHaveBeenCalledWith('ws-1');
     });
 
     it('derives slug from name when slug is omitted', async () => {
@@ -92,6 +105,7 @@ describe('WorkspacesService', () => {
           Promise.resolve({ ...mockWorkspace, slug: args.data.slug }),
       );
       prisma.workspaceMember.create.mockResolvedValue({} as never);
+      taskStatuses.seedDefaultsForWorkspace.mockResolvedValue(undefined);
 
       await service.create({ name: '  Hello World  ' }, 'user-1');
 
@@ -112,6 +126,7 @@ describe('WorkspacesService', () => {
         isPersonal: true,
       });
       prisma.workspaceMember.create.mockResolvedValue({} as never);
+      taskStatuses.seedDefaultsForWorkspace.mockResolvedValue(undefined);
 
       await service.create(
         { name: '  Personal  ', isPersonal: true },
@@ -130,7 +145,6 @@ describe('WorkspacesService', () => {
       prisma.workspaceMember.findMany.mockResolvedValue([
         { workspace: { slug: 'my-workspace' } },
       ]);
-      prisma.workspace.findFirst.mockResolvedValue(null);
 
       await expect(
         service.create({ name: 'My Workspace' }, 'user-1'),
@@ -154,11 +168,12 @@ describe('WorkspacesService', () => {
       expect(prisma.workspace.create).not.toHaveBeenCalled();
     });
 
-    it('allows same name when slug differs (different user has that slug)', async () => {
+    it('allows same name when user has no conflicting slug', async () => {
       prisma.workspaceMember.findMany.mockResolvedValue([]);
       prisma.workspace.findFirst.mockResolvedValue(null);
       prisma.workspace.create.mockResolvedValue(mockWorkspace);
       prisma.workspaceMember.create.mockResolvedValue({} as never);
+      taskStatuses.seedDefaultsForWorkspace.mockResolvedValue(undefined);
 
       const result = await service.create(
         { name: 'My Workspace', slug: 'my-workspace' },
@@ -169,7 +184,7 @@ describe('WorkspacesService', () => {
       expect(prisma.workspace.create).toHaveBeenCalled();
     });
 
-    it('uniquifies slug when another workspace (e.g. another user) already has it', async () => {
+    it('uniquifies slug when another workspace already has it', async () => {
       prisma.workspaceMember.findMany.mockResolvedValue([]);
       prisma.workspace.findFirst
         .mockResolvedValueOnce({ id: 'other-ws' })
@@ -179,6 +194,7 @@ describe('WorkspacesService', () => {
           Promise.resolve({ ...mockWorkspace, slug: args.data.slug }),
       );
       prisma.workspaceMember.create.mockResolvedValue({} as never);
+      taskStatuses.seedDefaultsForWorkspace.mockResolvedValue(undefined);
 
       await service.create({ name: 'My Workspace' }, 'user-1');
 
@@ -199,7 +215,7 @@ describe('WorkspacesService', () => {
       expect(result).toEqual([]);
     });
 
-    it('returns all workspaces the user is a member of', async () => {
+    it('returns all non-deleted workspaces the user is a member of', async () => {
       const ws1 = { ...mockWorkspace, id: 'ws-1' };
       const ws2 = { ...mockWorkspace, id: 'ws-2', name: 'Second' };
       prisma.workspaceMember.findMany.mockResolvedValue([
@@ -211,7 +227,7 @@ describe('WorkspacesService', () => {
 
       expect(result).toEqual([ws1, ws2]);
       expect(prisma.workspaceMember.findMany).toHaveBeenCalledWith({
-        where: { userId: 'user-1' },
+        where: { userId: 'user-1', workspace: { deletedAt: null } },
         include: { workspace: true },
       });
     });
@@ -219,23 +235,25 @@ describe('WorkspacesService', () => {
 
   describe('findOne', () => {
     it('returns workspace when user is a member', async () => {
-      prisma.workspaceMember.findUnique.mockResolvedValue({
+      prisma.workspaceMember.findFirst.mockResolvedValue({
         workspace: mockWorkspace,
       });
 
       const result = await service.findOne('ws-1', 'user-1');
 
       expect(result).toEqual(mockWorkspace);
-      expect(prisma.workspaceMember.findUnique).toHaveBeenCalledWith({
+      expect(prisma.workspaceMember.findFirst).toHaveBeenCalledWith({
         where: {
-          userId_workspaceId: { userId: 'user-1', workspaceId: 'ws-1' },
+          userId: 'user-1',
+          workspaceId: 'ws-1',
+          workspace: { deletedAt: null },
         },
         include: { workspace: true },
       });
     });
 
     it('throws NotFoundException when user is not a member', async () => {
-      prisma.workspaceMember.findUnique.mockResolvedValue(null);
+      prisma.workspaceMember.findFirst.mockResolvedValue(null);
 
       await expect(service.findOne('ws-1', 'user-1')).rejects.toThrow(
         NotFoundException,
@@ -248,7 +266,7 @@ describe('WorkspacesService', () => {
 
   describe('update', () => {
     it('updates only provided fields', async () => {
-      prisma.workspaceMember.findUnique.mockResolvedValue({
+      prisma.workspaceMember.findFirst.mockResolvedValue({
         workspace: mockWorkspace,
       });
       prisma.workspace.update.mockResolvedValue({
@@ -268,7 +286,7 @@ describe('WorkspacesService', () => {
     });
 
     it('throws NotFoundException when user is not a member', async () => {
-      prisma.workspaceMember.findUnique.mockResolvedValue(null);
+      prisma.workspaceMember.findFirst.mockResolvedValue(null);
 
       await expect(
         service.update('ws-1', 'user-1', { name: 'New' }),
@@ -278,7 +296,7 @@ describe('WorkspacesService', () => {
     });
 
     it('uniquifies slug when it conflicts with another workspace', async () => {
-      prisma.workspaceMember.findUnique.mockResolvedValue({
+      prisma.workspaceMember.findFirst.mockResolvedValue({
         workspace: mockWorkspace,
       });
       prisma.workspace.findFirst
@@ -300,7 +318,7 @@ describe('WorkspacesService', () => {
     });
 
     it('allows keeping same slug when updating own workspace (excludeId)', async () => {
-      prisma.workspaceMember.findUnique.mockResolvedValue({
+      prisma.workspaceMember.findFirst.mockResolvedValue({
         workspace: mockWorkspace,
       });
       prisma.workspace.findFirst.mockResolvedValue(null);
@@ -313,28 +331,32 @@ describe('WorkspacesService', () => {
         data: { slug: 'my-workspace' },
       });
       expect(prisma.workspace.findFirst).toHaveBeenCalledWith({
-        where: { slug: 'my-workspace', id: { not: 'ws-1' } },
+        where: { slug: 'my-workspace', deletedAt: null, id: { not: 'ws-1' } },
       });
     });
   });
 
   describe('remove', () => {
-    it('deletes workspace when user is owner', async () => {
-      prisma.workspaceMember.findUnique.mockResolvedValue({
+    it('soft-deletes workspace when user is owner', async () => {
+      prisma.workspaceMember.findFirst.mockResolvedValue({
         role: 'owner',
         workspaceId: 'ws-1',
       });
-      prisma.workspace.delete.mockResolvedValue(mockWorkspace);
+      prisma.workspace.update.mockResolvedValue({
+        ...mockWorkspace,
+        deletedAt: new Date(),
+      });
 
       await service.remove('ws-1', 'user-1');
 
-      expect(prisma.workspace.delete).toHaveBeenCalledWith({
+      expect(prisma.workspace.update).toHaveBeenCalledWith({
         where: { id: 'ws-1' },
+        data: { deletedAt: expect.any(Date) },
       });
     });
 
     it('throws ForbiddenException when user is member but not owner', async () => {
-      prisma.workspaceMember.findUnique.mockResolvedValue({
+      prisma.workspaceMember.findFirst.mockResolvedValue({
         role: 'member',
         workspaceId: 'ws-1',
       });
@@ -346,11 +368,11 @@ describe('WorkspacesService', () => {
         'Only the workspace owner can delete it',
       );
 
-      expect(prisma.workspace.delete).not.toHaveBeenCalled();
+      expect(prisma.workspace.update).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException when user is not a member', async () => {
-      prisma.workspaceMember.findUnique.mockResolvedValue(null);
+      prisma.workspaceMember.findFirst.mockResolvedValue(null);
 
       await expect(service.remove('ws-1', 'user-1')).rejects.toThrow(
         NotFoundException,
@@ -359,7 +381,7 @@ describe('WorkspacesService', () => {
         'Workspace not found',
       );
 
-      expect(prisma.workspace.delete).not.toHaveBeenCalled();
+      expect(prisma.workspace.update).not.toHaveBeenCalled();
     });
   });
 });
