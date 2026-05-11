@@ -1,7 +1,7 @@
 /**
- * OpenTelemetry instrumentation – must run before any other app code.
- * Only loads when OTEL_EXPORTER_OTLP_ENDPOINT is set (e.g. Grafana Cloud).
- * Uses OTLP HTTP (not gRPC). Sends traces/metrics to the configured endpoint.
+ * Instrumentation bootstrap – runs before any other app code.
+ * Initialises Sentry (when SENTRY_DSN is set) and OpenTelemetry
+ * (when OTEL_EXPORTER_OTLP_ENDPOINT is set).
  */
 import { config } from 'dotenv';
 import { resolve } from 'path';
@@ -10,6 +10,20 @@ import { resolve } from 'path';
 const root = process.cwd();
 config({ path: resolve(root, '.env.local') });
 config({ path: resolve(root, '.env') });
+
+if (process.env.SENTRY_DSN) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const Sentry = require('@sentry/nestjs');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { nodeProfilingIntegration } = require('@sentry/profiling-node');
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+    integrations: [nodeProfilingIntegration()],
+    tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+    profilesSampleRate: 1.0,
+  });
+}
 
 const otelEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 if (otelEndpoint) {
