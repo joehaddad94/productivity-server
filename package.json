@@ -37,6 +37,8 @@
     "@opentelemetry/auto-instrumentations-node": "^0.70.1",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
+    "@sentry/nestjs": "^10.52.0",
+    "@sentry/profiling-node": "^10.52.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",

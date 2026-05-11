@@ -1,6 +1,7 @@
 import './instrumentation';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { SentryGlobalFilter } from '@sentry/nestjs/setup';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
 import { trace } from '@opentelemetry/api';
@@ -53,6 +54,10 @@ async function bootstrap() {
     origin: true, // or set to your frontend origin(s), e.g. ['http://localhost:5173']
     credentials: true,
   });
+
+  if (process.env.SENTRY_DSN) {
+    app.useGlobalFilters(new SentryGlobalFilter());
+  }
 
   app.useGlobalPipes(
     new ValidationPipe({
