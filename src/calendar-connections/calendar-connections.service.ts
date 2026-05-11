@@ -58,7 +58,7 @@ export class CalendarConnectionsService {
         .update(payload)
         .digest('hex');
       if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
-        throw new Error('bad sig');
+        throw new BadRequestException('Invalid OAuth state');
       }
       const [userId, tsStr] = payload.split(':');
       if (Date.now() - parseInt(tsStr, 10) > 10 * 60 * 1000) {
