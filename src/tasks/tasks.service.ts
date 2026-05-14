@@ -183,17 +183,20 @@ export class TasksService {
       },
     });
 
+    // Fire-and-forget: log creation activity + assignment notifications
+    void this.logActivity(created.id, userId, 'created');
+
     if (assigneeRows.length > 0) {
       const recipientIds = assigneeRows
         .map((r) => r.userId)
         .filter((uid) => uid !== userId);
       if (recipientIds.length > 0) {
-        await this.notifyAssigned(
-          workspaceId,
-          created.id,
-          created.title,
-          recipientIds,
-        );
+        void this.notifyAssigned(workspaceId, created.id, created.title, recipientIds);
+      }
+      for (const row of assigneeRows) {
+        void this.logActivity(created.id, userId, 'assigned', {
+          assigneeId: row.userId,
+        });
       }
     }
 
@@ -293,7 +296,10 @@ export class TasksService {
     });
 
     if (newAssigneeIds.length > 0) {
-      await this.notifyAssigned(workspaceId, taskId, task.title, newAssigneeIds);
+      void this.notifyAssigned(workspaceId, taskId, task.title, newAssigneeIds);
+      for (const uid of newAssigneeIds) {
+        void this.logActivity(taskId, requesterId, 'assigned', { assigneeId: uid });
+      }
     }
 
     return this.fetchTaskWithDetails(workspaceId, taskId);
@@ -325,7 +331,24 @@ export class TasksService {
       where: { taskId, userId: targetUserId },
     });
 
+    void this.logActivity(taskId, requesterId, 'unassigned', {
+      assigneeId: targetUserId,
+    });
+
     return this.fetchTaskWithDetails(workspaceId, taskId);
+  }
+
+  private logActivity(
+    taskId: string,
+    userId: string,
+    type: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return this.prisma.taskActivity
+      .create({ data: { taskId, userId, type, metadata: (metadata as any) ?? undefined } })
+      .then(() => undefined)
+      .catch(() => undefined); // never block the primary operation
   }
 
   private async fetchTaskWithDetails(
@@ -424,6 +447,26 @@ export class TasksService {
           : {}),
       },
     });
+
+    // Log field changes as activity (fire-and-forget)
+    if (dto.status !== undefined && dto.status !== existing.status) {
+      void this.logActivity(id, userId, 'status_changed', {
+        from: existing.status,
+        to: dto.status,
+      });
+    }
+    if (dto.dueDate !== undefined) {
+      void this.logActivity(id, userId, 'due_date_changed', {
+        from: existing.dueDate?.toISOString().slice(0, 10) ?? null,
+        to: dto.dueDate ?? null,
+      });
+    }
+    if (dto.priority !== undefined && dto.priority !== existing.priority) {
+      void this.logActivity(id, userId, 'priority_changed', {
+        from: existing.priority ?? null,
+        to: dto.priority,
+      });
+    }
 
     if (isCompleting) {
       // Cascade completion to all non-terminal subtasks in parallel

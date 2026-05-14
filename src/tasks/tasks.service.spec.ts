@@ -84,8 +84,17 @@ describe('TasksService', () => {
         update: jest.fn(),
         updateMany: jest.fn(),
       },
+      taskAssignee: {
+        findMany: jest.fn(),
+        createMany: jest.fn(),
+        deleteMany: jest.fn(),
+      },
+      taskActivity: {
+        create: jest.fn().mockResolvedValue(undefined),
+      },
       user: {
         findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       $transaction: jest.fn(),
     };
