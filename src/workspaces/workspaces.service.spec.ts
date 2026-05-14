@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { TaskStatusesService } from '../task-statuses/task-statuses.service';
 import { WorkspacesService } from './workspaces.service';
+import { membershipCache, membershipKey } from '../common/membership-cache';
 
 describe('WorkspacesService', () => {
   let service: WorkspacesService;
@@ -67,6 +68,7 @@ describe('WorkspacesService', () => {
     service = module.get<WorkspacesService>(WorkspacesService);
     prisma = module.get(PrismaService);
     taskStatuses = module.get(TaskStatusesService);
+    membershipCache.delete(membershipKey('user-1', 'ws-1'));
     jest.clearAllMocks();
   });
 
@@ -338,8 +340,9 @@ describe('WorkspacesService', () => {
 
   describe('remove', () => {
     it('soft-deletes workspace when user is owner', async () => {
-      prisma.workspaceMember.findFirst.mockResolvedValue({
+      prisma.workspaceMember.findUnique.mockResolvedValue({
         role: 'owner',
+        canSeeAllTasks: false,
         workspaceId: 'ws-1',
       });
       prisma.workspace.update.mockResolvedValue({
@@ -356,8 +359,9 @@ describe('WorkspacesService', () => {
     });
 
     it('throws ForbiddenException when user is member but not owner', async () => {
-      prisma.workspaceMember.findFirst.mockResolvedValue({
+      prisma.workspaceMember.findUnique.mockResolvedValue({
         role: 'member',
+        canSeeAllTasks: true,
         workspaceId: 'ws-1',
       });
 
@@ -371,14 +375,11 @@ describe('WorkspacesService', () => {
       expect(prisma.workspace.update).not.toHaveBeenCalled();
     });
 
-    it('throws NotFoundException when user is not a member', async () => {
-      prisma.workspaceMember.findFirst.mockResolvedValue(null);
+    it('throws ForbiddenException when user is not a member', async () => {
+      prisma.workspaceMember.findUnique.mockResolvedValue(null);
 
       await expect(service.remove('ws-1', 'user-1')).rejects.toThrow(
-        NotFoundException,
-      );
-      await expect(service.remove('ws-1', 'user-1')).rejects.toThrow(
-        'Workspace not found',
+        ForbiddenException,
       );
 
       expect(prisma.workspace.update).not.toHaveBeenCalled();

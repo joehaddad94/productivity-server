@@ -261,9 +261,28 @@ export class WorkspacesService {
     });
     if (!targetMembership) throw new NotFoundException('Member not found');
 
-    await this.prisma.workspaceMember.delete({
-      where: { userId_workspaceId: { userId: targetUserId, workspaceId } },
-    });
+    // Cleanup: unassign all their TaskAssignee rows, soft-delete tasks
+    // they created, then drop the workspace_member row. All in one tx.
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.taskAssignee.deleteMany({
+        where: {
+          userId: targetUserId,
+          task: { workspaceId },
+        },
+      }),
+      this.prisma.task.updateMany({
+        where: {
+          workspaceId,
+          creatorId: targetUserId,
+          deletedAt: null,
+        },
+        data: { deletedAt: now },
+      }),
+      this.prisma.workspaceMember.delete({
+        where: { userId_workspaceId: { userId: targetUserId, workspaceId } },
+      }),
+    ]);
     membershipCache.delete(membershipKey(targetUserId, workspaceId));
   }
 
