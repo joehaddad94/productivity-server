@@ -163,7 +163,7 @@ export class TasksService {
       }
     }
 
-    return this.prisma.task.create({
+    const created = await this.prisma.task.create({
       data: {
         workspaceId,
         creatorId: userId,
@@ -182,6 +182,59 @@ export class TasksService {
           : {}),
       },
     });
+
+    if (assigneeRows.length > 0) {
+      const recipientIds = assigneeRows
+        .map((r) => r.userId)
+        .filter((uid) => uid !== userId);
+      if (recipientIds.length > 0) {
+        await this.notifyAssigned(
+          workspaceId,
+          created.id,
+          created.title,
+          recipientIds,
+        );
+      }
+    }
+
+    return created;
+  }
+
+  /**
+   * Send a "task assigned to you" notification to each recipient.
+   * Skips silently on per-user delivery failure so one bad subscription
+   * doesn't break the whole assignment call.
+   */
+  private async notifyAssigned(
+    workspaceId: string,
+    taskId: string,
+    taskTitle: string,
+    recipientUserIds: string[],
+  ): Promise<void> {
+    if (recipientUserIds.length === 0) return;
+
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: recipientUserIds } },
+      select: { id: true, email: true, timezone: true },
+    });
+
+    await Promise.all(
+      users.map((u) =>
+        this.notificationsService
+          .createAndDeliver({
+            userId: u.id,
+            workspaceId,
+            taskId,
+            type: 'task_assigned',
+            title: 'Task assigned',
+            body: `"${taskTitle}" has been assigned to you`,
+            userEmail: u.email,
+            userTimezone: u.timezone,
+            url: '/tasks',
+          })
+          .catch(() => undefined),
+      ),
+    );
   }
 
   private async assertUsersInWorkspace(
@@ -222,6 +275,14 @@ export class TasksService {
     });
     if (!task) throw new NotFoundException('Task not found');
 
+    // Figure out which userIds are actually new — only those get notified
+    const existing = await this.prisma.taskAssignee.findMany({
+      where: { taskId, userId: { in: userIds } },
+      select: { userId: true },
+    });
+    const existingIds = new Set(existing.map((e) => e.userId));
+    const newAssigneeIds = userIds.filter((uid) => !existingIds.has(uid));
+
     await this.prisma.taskAssignee.createMany({
       data: userIds.map((uid) => ({
         taskId,
@@ -230,6 +291,10 @@ export class TasksService {
       })),
       skipDuplicates: true,
     });
+
+    if (newAssigneeIds.length > 0) {
+      await this.notifyAssigned(workspaceId, taskId, task.title, newAssigneeIds);
+    }
 
     return this.fetchTaskWithDetails(workspaceId, taskId);
   }

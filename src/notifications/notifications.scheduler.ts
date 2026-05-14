@@ -3,8 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { TaskStatusesService } from '../task-statuses/task-statuses.service';
 import { NotificationsService } from './notifications.service';
-import { buildTaskVisibilityWhere } from '../tasks/task-visibility';
-import type { WorkspaceRole } from '../common/assert-member';
+import { buildTaskRelevanceWhere } from '../tasks/task-visibility';
 
 function getLocalHour(timezone: string | null | undefined): number {
   const tz = timezone ?? 'UTC';
@@ -94,8 +93,6 @@ export class NotificationsScheduler {
   private async runDailyAgenda(member: {
     userId: string;
     workspaceId: string;
-    role: string;
-    canSeeAllTasks: boolean;
     user: { email: string; timezone: string | null };
   }) {
     const { today, tomorrow } = getLocalDayBoundaries(member.user.timezone);
@@ -116,11 +113,7 @@ export class NotificationsScheduler {
     );
     const notDone =
       terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
-    const visibility = buildTaskVisibilityWhere(
-      member.userId,
-      member.role as WorkspaceRole,
-      member.canSeeAllTasks,
-    );
+    const relevance = buildTaskRelevanceWhere(member.userId);
 
     const [dueTodayCount, overdueCount] = await Promise.all([
       this.prisma.task.count({
@@ -129,7 +122,7 @@ export class NotificationsScheduler {
           dueDate: { gte: today, lt: tomorrow },
           ...notDone,
           deletedAt: null,
-          ...visibility,
+          ...relevance,
         },
       }),
       this.prisma.task.count({
@@ -138,7 +131,7 @@ export class NotificationsScheduler {
           dueDate: { lt: today },
           ...notDone,
           deletedAt: null,
-          ...visibility,
+          ...relevance,
         },
       }),
     ]);
@@ -166,8 +159,6 @@ export class NotificationsScheduler {
   private async runOverdueCheck(member: {
     userId: string;
     workspaceId: string;
-    role: string;
-    canSeeAllTasks: boolean;
     user: { email: string; timezone: string | null };
   }) {
     const { today } = getLocalDayBoundaries(member.user.timezone);
@@ -177,11 +168,7 @@ export class NotificationsScheduler {
     );
     const notDone =
       terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
-    const visibility = buildTaskVisibilityWhere(
-      member.userId,
-      member.role as WorkspaceRole,
-      member.canSeeAllTasks,
-    );
+    const relevance = buildTaskRelevanceWhere(member.userId);
 
     const overdueTasks = await this.prisma.task.findMany({
       where: {
@@ -189,7 +176,7 @@ export class NotificationsScheduler {
         dueDate: { lt: today },
         ...notDone,
         deletedAt: null,
-        ...visibility,
+        ...relevance,
       },
       take: 5,
       orderBy: { dueDate: 'asc' },
@@ -223,8 +210,6 @@ export class NotificationsScheduler {
   private async runDueTodayReminder(member: {
     userId: string;
     workspaceId: string;
-    role: string;
-    canSeeAllTasks: boolean;
     user: { email: string; timezone: string | null };
   }) {
     const { today, tomorrow } = getLocalDayBoundaries(member.user.timezone);
@@ -234,11 +219,7 @@ export class NotificationsScheduler {
     );
     const notDone =
       terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
-    const visibility = buildTaskVisibilityWhere(
-      member.userId,
-      member.role as WorkspaceRole,
-      member.canSeeAllTasks,
-    );
+    const relevance = buildTaskRelevanceWhere(member.userId);
 
     const dueTasks = await this.prisma.task.findMany({
       where: {
@@ -246,7 +227,7 @@ export class NotificationsScheduler {
         dueDate: { gte: today, lt: tomorrow },
         ...notDone,
         deletedAt: null,
-        ...visibility,
+        ...relevance,
       },
       take: 5,
       orderBy: { priority: 'desc' },

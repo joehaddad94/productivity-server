@@ -30,3 +30,20 @@ export function buildTaskVisibilityWhere(
     ],
   };
 }
+
+/**
+ * Returns a Prisma WHERE fragment for tasks the user should be NOTIFIED about,
+ * regardless of role: creator, assignee, or assigner. Used by the notification
+ * scheduler so e.g. an admin assigned to a task by someone else still gets a
+ * due-date reminder, and members with canSeeAllTasks=true don't get spammed for
+ * tasks they have nothing to do with.
+ */
+export function buildTaskRelevanceWhere(userId: string): Prisma.TaskWhereInput {
+  return {
+    OR: [
+      { creatorId: userId },
+      { assignees: { some: { userId } } },
+      { assignees: { some: { assignedById: userId } } },
+    ],
+  };
+}
