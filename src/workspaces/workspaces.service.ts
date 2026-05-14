@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -6,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { membershipCache, membershipKey } from '../common/membership-cache';
+import { assertMember } from '../common/assert-member';
 import { MailService } from '../mail/mail.service';
 import { TaskStatusesService } from '../task-statuses/task-statuses.service';
 import { ConfigService } from '@nestjs/config';
@@ -90,6 +92,7 @@ export class WorkspacesService {
         role: 'owner',
       },
     });
+    membershipCache.set(membershipKey(userId, workspace.id), 'owner');
 
     await this.taskStatuses.seedDefaultsForWorkspace(workspace.id);
 
@@ -134,11 +137,8 @@ export class WorkspacesService {
   }
 
   async remove(id: string, userId: string): Promise<void> {
-    const membership = await this.prisma.workspaceMember.findFirst({
-      where: { userId, workspaceId: id, workspace: { deletedAt: null } },
-    });
-    if (!membership) throw new NotFoundException('Workspace not found');
-    if (membership.role !== 'owner') {
+    const role = await assertMember(this.prisma, id, userId);
+    if (role !== 'owner') {
       throw new ForbiddenException('Only the workspace owner can delete it');
     }
 
@@ -154,15 +154,7 @@ export class WorkspacesService {
     workspaceId: string,
     requesterId: string,
   ): Promise<MemberWithUser[]> {
-    const requesterMembership = await this.prisma.workspaceMember.findFirst({
-      where: {
-        userId: requesterId,
-        workspaceId,
-        workspace: { deletedAt: null },
-      },
-    });
-    if (!requesterMembership)
-      throw new ForbiddenException("You don't have access to this workspace");
+    await assertMember(this.prisma, workspaceId, requesterId);
 
     return this.prisma.workspaceMember.findMany({
       where: { workspaceId },
@@ -179,15 +171,12 @@ export class WorkspacesService {
     requesterId: string,
     dto: InviteMemberDto,
   ): Promise<{ invited: boolean; message: string }> {
-    const requesterMembership = await this.prisma.workspaceMember.findFirst({
-      where: {
-        userId: requesterId,
-        workspaceId,
-        workspace: { deletedAt: null },
-      },
-    });
-    if (!requesterMembership)
-      throw new ForbiddenException("You don't have access to this workspace");
+    const role = await assertMember(this.prisma, workspaceId, requesterId);
+    if (role !== 'owner') {
+      throw new ForbiddenException(
+        'Only the workspace owner can invite members',
+      );
+    }
 
     const workspace = await this.prisma.workspace.findFirst({
       where: { id: workspaceId, deletedAt: null },
@@ -250,19 +239,18 @@ export class WorkspacesService {
     requesterId: string,
     targetUserId: string,
   ): Promise<void> {
-    const requesterMembership = await this.prisma.workspaceMember.findFirst({
-      where: {
-        userId: requesterId,
-        workspaceId,
-        workspace: { deletedAt: null },
-      },
-    });
-    if (!requesterMembership)
-      throw new ForbiddenException("You don't have access to this workspace");
-    if (requesterMembership.role !== 'owner') {
+    const requesterRole = await assertMember(
+      this.prisma,
+      workspaceId,
+      requesterId,
+    );
+    if (requesterRole !== 'owner') {
       throw new ForbiddenException(
         'Only the workspace owner can remove members',
       );
+    }
+    if (requesterId === targetUserId) {
+      throw new BadRequestException('The owner cannot remove themselves');
     }
 
     const targetMembership = await this.prisma.workspaceMember.findUnique({
@@ -276,24 +264,26 @@ export class WorkspacesService {
     membershipCache.delete(membershipKey(targetUserId, workspaceId));
   }
 
-  async updateMemberRole(
+  async updateMember(
     workspaceId: string,
     requesterId: string,
     targetUserId: string,
     dto: UpdateMemberDto,
   ): Promise<WorkspaceMember> {
-    const requesterMembership = await this.prisma.workspaceMember.findFirst({
-      where: {
-        userId: requesterId,
-        workspaceId,
-        workspace: { deletedAt: null },
-      },
-    });
-    if (!requesterMembership)
-      throw new ForbiddenException("You don't have access to this workspace");
-    if (requesterMembership.role !== 'owner') {
+    if (dto.role === undefined && dto.canSeeAllTasks === undefined) {
+      throw new BadRequestException(
+        'Must provide at least one of: role, canSeeAllTasks',
+      );
+    }
+
+    const requesterRole = await assertMember(
+      this.prisma,
+      workspaceId,
+      requesterId,
+    );
+    if (requesterRole !== 'owner') {
       throw new ForbiddenException(
-        'Only the workspace owner can update member roles',
+        'Only the workspace owner can update members',
       );
     }
 
@@ -302,9 +292,25 @@ export class WorkspacesService {
     });
     if (!targetMembership) throw new NotFoundException('Member not found');
 
-    return this.prisma.workspaceMember.update({
+    if (dto.role !== undefined && targetMembership.role === 'owner') {
+      throw new BadRequestException("Cannot change the owner's role");
+    }
+
+    const updated = await this.prisma.workspaceMember.update({
       where: { userId_workspaceId: { userId: targetUserId, workspaceId } },
-      data: { role: dto.role },
+      data: {
+        ...(dto.role !== undefined ? { role: dto.role } : {}),
+        ...(dto.canSeeAllTasks !== undefined
+          ? { canSeeAllTasks: dto.canSeeAllTasks }
+          : {}),
+      },
     });
+
+    // Invalidate cache if role changed so the next request loads the new role
+    if (dto.role !== undefined) {
+      membershipCache.delete(membershipKey(targetUserId, workspaceId));
+    }
+
+    return updated;
   }
 }

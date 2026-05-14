@@ -132,17 +132,19 @@ export class WorkspacesController {
   }
 
   @Patch(':id/members/:userId')
-  @ApiOperation({ summary: 'Update a member role (owner only)' })
-  @ApiResponse({ status: 200, description: 'Member role updated' })
+  @ApiOperation({
+    summary: 'Update a member (role and/or visibility — owner only)',
+  })
+  @ApiResponse({ status: 200, description: 'Member updated' })
   @ApiResponse({ status: 403, description: 'Owner only' })
   @ApiResponse({ status: 404, description: 'Member not found' })
-  async updateMemberRole(
+  async updateMember(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('userId', ParseUUIDPipe) targetUserId: string,
     @CurrentUser() user: RequestUser,
     @Body() dto: UpdateMemberDto,
   ) {
-    const member = await this.workspacesService.updateMemberRole(
+    const member = await this.workspacesService.updateMember(
       id,
       user.id,
       targetUserId,

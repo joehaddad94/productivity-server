@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { membershipCache, membershipKey } from '../common/membership-cache';
+import { assertMember } from '../common/assert-member';
 import type { WorkspaceTaskStatus } from '@prisma/client';
 import { CreateTaskStatusDto } from './dto/create-task-status.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
@@ -24,20 +24,6 @@ export type TaskStatusApi = {
 @Injectable()
 export class TaskStatusesService {
   constructor(private readonly prisma: PrismaService) {}
-
-  private async assertMember(
-    workspaceId: string,
-    userId: string,
-  ): Promise<void> {
-    const key = membershipKey(userId, workspaceId);
-    if (membershipCache.get(key)) return;
-    const membership = await this.prisma.workspaceMember.findUnique({
-      where: { userId_workspaceId: { userId, workspaceId } },
-    });
-    if (!membership)
-      throw new ForbiddenException("You don't have access to this workspace");
-    membershipCache.set(key, true);
-  }
 
   private toApi(row: WorkspaceTaskStatus): TaskStatusApi {
     return {
@@ -89,7 +75,7 @@ export class TaskStatusesService {
     workspaceId: string,
     userId: string,
   ): Promise<{ statuses: TaskStatusApi[] }> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
     await this.seedDefaultsForWorkspace(workspaceId);
     const rows = await this.prisma.workspaceTaskStatus.findMany({
       where: { workspaceId },
@@ -103,7 +89,7 @@ export class TaskStatusesService {
     statusId: string,
     userId: string,
   ): Promise<WorkspaceTaskStatus> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
     const row = await this.prisma.workspaceTaskStatus.findFirst({
       where: { id: statusId, workspaceId },
     });
@@ -165,7 +151,7 @@ export class TaskStatusesService {
     userId: string,
     dto: CreateTaskStatusDto,
   ): Promise<{ status: TaskStatusApi }> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
     const maxOrder = await this.prisma.workspaceTaskStatus.aggregate({
       where: { workspaceId },
       _max: { sortOrder: true },
@@ -307,7 +293,7 @@ export class TaskStatusesService {
     idA: string,
     idB: string,
   ): Promise<{ statuses: TaskStatusApi[] }> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
 
     const [a, b] = await Promise.all([
       this.prisma.workspaceTaskStatus.findFirst({

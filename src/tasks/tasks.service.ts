@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { membershipCache, membershipKey } from '../common/membership-cache';
+import { assertMember } from '../common/assert-member';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Task } from '@prisma/client';
@@ -25,26 +25,12 @@ export class TasksService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  private async assertMember(
-    workspaceId: string,
-    userId: string,
-  ): Promise<void> {
-    const key = membershipKey(userId, workspaceId);
-    if (membershipCache.get(key)) return;
-    const membership = await this.prisma.workspaceMember.findUnique({
-      where: { userId_workspaceId: { userId, workspaceId } },
-    });
-    if (!membership)
-      throw new ForbiddenException("You don't have access to this workspace");
-    membershipCache.set(key, true);
-  }
-
   async list(
     workspaceId: string,
     userId: string,
     query: QueryTaskDto,
   ): Promise<{ tasks: TaskWithSubtasks[]; total: number }> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
 
     const where = {
       workspaceId,
@@ -105,7 +91,7 @@ export class TasksService {
     userId: string,
     dto: CreateTaskDto,
   ): Promise<Task> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
 
     const statusId =
       dto.status ??
@@ -135,7 +121,7 @@ export class TasksService {
     id: string,
     userId: string,
   ): Promise<TaskWithSubtasks> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
 
     const task = await this.prisma.task.findFirst({
       where: { id, workspaceId, deletedAt: null },
@@ -327,7 +313,7 @@ export class TasksService {
     userId: string,
     ids: string[],
   ): Promise<void> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
     await this.prisma.$transaction(
       ids.map((id, index) =>
         this.prisma.task.update({
@@ -343,7 +329,7 @@ export class TasksService {
     userId: string,
     dto: BulkTaskDto,
   ): Promise<{ affected: number }> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
 
     const tasks = await this.prisma.task.findMany({
       where: { id: { in: dto.ids }, workspaceId, deletedAt: null },
