@@ -1,6 +1,6 @@
 import './instrumentation';
 import { ValidationPipe, Logger } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { SentryGlobalFilter } from '@sentry/nestjs/setup';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
@@ -56,7 +56,8 @@ async function bootstrap() {
   });
 
   if (process.env.SENTRY_DSN) {
-    app.useGlobalFilters(new SentryGlobalFilter());
+    const { httpAdapter } = app.get(HttpAdapterHost);
+    app.useGlobalFilters(new SentryGlobalFilter(httpAdapter));
   }
 
   app.useGlobalPipes(
