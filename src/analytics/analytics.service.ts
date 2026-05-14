@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertMember } from '../common/assert-member';
 import { DailyStat } from '@prisma/client';
@@ -97,6 +97,58 @@ export class AnalyticsService {
     totals.streak = this.computeStreak(allStats);
 
     return { dailyStats, totals };
+  }
+
+  async getTeamAnalytics(
+    workspaceId: string,
+    requesterId: string,
+    query: QueryAnalyticsDto,
+  ) {
+    const { role } = await assertMember(this.prisma, workspaceId, requesterId);
+    if (role !== 'owner' && role !== 'admin') {
+      throw new ForbiddenException(
+        'Only owner or admin can view team analytics',
+      );
+    }
+
+    const from = query.from ? new Date(query.from) : undefined;
+    const to = query.to ? new Date(query.to) : undefined;
+
+    const [members, grouped] = await Promise.all([
+      this.prisma.workspaceMember.findMany({
+        where: { workspaceId },
+        include: {
+          user: { select: { id: true, email: true, name: true, avatarUrl: true } },
+        },
+      }),
+      this.prisma.dailyStat.groupBy({
+        by: ['userId'],
+        where: {
+          workspaceId,
+          ...(from || to
+            ? { date: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }
+            : {}),
+        },
+        _sum: { tasksCompleted: true, focusMinutes: true },
+      }),
+    ]);
+
+    const statsByUser = new Map(
+      grouped.map((g) => [
+        g.userId,
+        { tasksCompleted: g._sum.tasksCompleted ?? 0, focusMinutes: g._sum.focusMinutes ?? 0 },
+      ]),
+    );
+
+    return members
+      .map((m) => ({
+        userId: m.userId,
+        user: m.user,
+        role: m.role,
+        tasksCompleted: statsByUser.get(m.userId)?.tasksCompleted ?? 0,
+        focusMinutes: statsByUser.get(m.userId)?.focusMinutes ?? 0,
+      }))
+      .sort((a, b) => b.tasksCompleted - a.tasksCompleted);
   }
 
   async logStat(
