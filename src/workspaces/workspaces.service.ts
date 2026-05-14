@@ -92,7 +92,10 @@ export class WorkspacesService {
         role: 'owner',
       },
     });
-    membershipCache.set(membershipKey(userId, workspace.id), 'owner');
+    membershipCache.set(membershipKey(userId, workspace.id), {
+      role: 'owner',
+      canSeeAllTasks: false,
+    });
 
     await this.taskStatuses.seedDefaultsForWorkspace(workspace.id);
 
@@ -137,7 +140,7 @@ export class WorkspacesService {
   }
 
   async remove(id: string, userId: string): Promise<void> {
-    const role = await assertMember(this.prisma, id, userId);
+    const { role } = await assertMember(this.prisma, id, userId);
     if (role !== 'owner') {
       throw new ForbiddenException('Only the workspace owner can delete it');
     }
@@ -171,7 +174,7 @@ export class WorkspacesService {
     requesterId: string,
     dto: InviteMemberDto,
   ): Promise<{ invited: boolean; message: string }> {
-    const role = await assertMember(this.prisma, workspaceId, requesterId);
+    const { role } = await assertMember(this.prisma, workspaceId, requesterId);
     if (role !== 'owner') {
       throw new ForbiddenException(
         'Only the workspace owner can invite members',
@@ -239,7 +242,7 @@ export class WorkspacesService {
     requesterId: string,
     targetUserId: string,
   ): Promise<void> {
-    const requesterRole = await assertMember(
+    const { role: requesterRole } = await assertMember(
       this.prisma,
       workspaceId,
       requesterId,
@@ -276,7 +279,7 @@ export class WorkspacesService {
       );
     }
 
-    const requesterRole = await assertMember(
+    const { role: requesterRole } = await assertMember(
       this.prisma,
       workspaceId,
       requesterId,

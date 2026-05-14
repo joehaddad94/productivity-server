@@ -7,12 +7,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { assertMember } from '../common/assert-member';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { Task } from '@prisma/client';
+import { Prisma, Task } from '@prisma/client';
 import { CreateTaskDto, RecurrenceRule } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { QueryTaskDto } from './dto/query-task.dto';
 import { BulkTaskDto, BulkTaskAction } from './dto/bulk-task.dto';
 import { TaskStatusesService } from '../task-statuses/task-statuses.service';
+import { buildTaskVisibilityWhere } from './task-visibility';
 
 type TaskWithSubtasks = Task & { subtasks: Task[] };
 
@@ -30,9 +31,14 @@ export class TasksService {
     userId: string,
     query: QueryTaskDto,
   ): Promise<{ tasks: TaskWithSubtasks[]; total: number }> {
-    await assertMember(this.prisma, workspaceId, userId);
+    const { role, canSeeAllTasks } = await assertMember(
+      this.prisma,
+      workspaceId,
+      userId,
+    );
+    const visibility = buildTaskVisibilityWhere(userId, role, canSeeAllTasks);
 
-    const where = {
+    const where: Prisma.TaskWhereInput = {
       workspaceId,
       deletedAt: null,
       parentTaskId: null,
@@ -62,6 +68,7 @@ export class TasksService {
           }
         : {}),
       ...(query.projectId ? { projectId: query.projectId } : {}),
+      ...(Object.keys(visibility).length > 0 ? { AND: [visibility] } : {}),
     };
 
     const limit = query.limit ?? 50;
@@ -72,7 +79,7 @@ export class TasksService {
         where,
         include: {
           subtasks: {
-            where: { deletedAt: null },
+            where: { deletedAt: null, ...visibility },
             orderBy: { createdAt: 'asc' },
           },
         },
@@ -102,6 +109,7 @@ export class TasksService {
     return this.prisma.task.create({
       data: {
         workspaceId,
+        creatorId: userId,
         title: dto.title.trim(),
         description: dto.description,
         dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
@@ -121,13 +129,18 @@ export class TasksService {
     id: string,
     userId: string,
   ): Promise<TaskWithSubtasks> {
-    await assertMember(this.prisma, workspaceId, userId);
+    const { role, canSeeAllTasks } = await assertMember(
+      this.prisma,
+      workspaceId,
+      userId,
+    );
+    const visibility = buildTaskVisibilityWhere(userId, role, canSeeAllTasks);
 
     const task = await this.prisma.task.findFirst({
-      where: { id, workspaceId, deletedAt: null },
+      where: { id, workspaceId, deletedAt: null, ...visibility },
       include: {
         subtasks: {
-          where: { deletedAt: null },
+          where: { deletedAt: null, ...visibility },
           orderBy: { createdAt: 'asc' },
         },
       },
@@ -267,6 +280,7 @@ export class TasksService {
     await this.prisma.task.create({
       data: {
         workspaceId,
+        creatorId: task.creatorId,
         title: task.title,
         description: task.description,
         dueDate: nextDue,
@@ -313,9 +327,23 @@ export class TasksService {
     userId: string,
     ids: string[],
   ): Promise<void> {
-    await assertMember(this.prisma, workspaceId, userId);
+    const { role, canSeeAllTasks } = await assertMember(
+      this.prisma,
+      workspaceId,
+      userId,
+    );
+    const visibility = buildTaskVisibilityWhere(userId, role, canSeeAllTasks);
+
+    // Only reorder tasks the user can actually see
+    const visibleTasks = await this.prisma.task.findMany({
+      where: { id: { in: ids }, workspaceId, deletedAt: null, ...visibility },
+      select: { id: true },
+    });
+    const visibleIds = new Set(visibleTasks.map((t) => t.id));
+    const orderedVisibleIds = ids.filter((id) => visibleIds.has(id));
+
     await this.prisma.$transaction(
-      ids.map((id, index) =>
+      orderedVisibleIds.map((id, index) =>
         this.prisma.task.update({
           where: { id, workspaceId },
           data: { sortOrder: index },
@@ -329,10 +357,20 @@ export class TasksService {
     userId: string,
     dto: BulkTaskDto,
   ): Promise<{ affected: number }> {
-    await assertMember(this.prisma, workspaceId, userId);
+    const { role, canSeeAllTasks } = await assertMember(
+      this.prisma,
+      workspaceId,
+      userId,
+    );
+    const visibility = buildTaskVisibilityWhere(userId, role, canSeeAllTasks);
 
     const tasks = await this.prisma.task.findMany({
-      where: { id: { in: dto.ids }, workspaceId, deletedAt: null },
+      where: {
+        id: { in: dto.ids },
+        workspaceId,
+        deletedAt: null,
+        ...visibility,
+      },
       select: { id: true, status: true },
     });
 
