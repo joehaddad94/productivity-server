@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayUnique,
+  IsArray,
   IsEnum,
   IsOptional,
   IsString,
@@ -71,4 +73,14 @@ export class CreateTaskDto {
   @IsOptional()
   @IsUUID()
   projectId?: string;
+
+  @ApiPropertyOptional({
+    description: 'User IDs to assign to the task (owner/admin only)',
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID('all', { each: true })
+  assigneeIds?: string[];
 }

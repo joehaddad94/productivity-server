@@ -27,6 +27,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { QueryTaskDto } from './dto/query-task.dto';
 import { BulkTaskDto } from './dto/bulk-task.dto';
+import { AssignTaskDto } from './dto/assign-task.dto';
 
 @ApiTags('tasks')
 @Controller('workspaces/:workspaceId/tasks')
@@ -144,5 +145,45 @@ export class TasksController {
   ) {
     await this.tasksService.reorder(workspaceId, user.id, body.ids);
     return { success: true };
+  }
+
+  @Post(':id/assign')
+  @ApiOperation({ summary: 'Add assignees to a task (owner/admin only)' })
+  @ApiResponse({ status: 201, description: 'Assignees added' })
+  @ApiResponse({ status: 403, description: 'Owner/admin only' })
+  @ApiResponse({ status: 404, description: 'Task not found' })
+  async assign(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: RequestUser,
+    @Body() dto: AssignTaskDto,
+  ) {
+    const task = await this.tasksService.addAssignees(
+      workspaceId,
+      id,
+      user.id,
+      dto.userIds,
+    );
+    return { task };
+  }
+
+  @Delete(':id/assign/:userId')
+  @ApiOperation({ summary: 'Remove an assignee from a task (owner/admin only)' })
+  @ApiResponse({ status: 200, description: 'Assignee removed' })
+  @ApiResponse({ status: 403, description: 'Owner/admin only' })
+  @ApiResponse({ status: 404, description: 'Task not found' })
+  async unassign(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('userId', ParseUUIDPipe) targetUserId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    const task = await this.tasksService.removeAssignee(
+      workspaceId,
+      id,
+      user.id,
+      targetUserId,
+    );
+    return { task };
   }
 }

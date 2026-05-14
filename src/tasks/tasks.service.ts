@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -15,7 +16,25 @@ import { BulkTaskDto, BulkTaskAction } from './dto/bulk-task.dto';
 import { TaskStatusesService } from '../task-statuses/task-statuses.service';
 import { buildTaskVisibilityWhere } from './task-visibility';
 
-type TaskWithSubtasks = Task & { subtasks: Task[] };
+const ASSIGNEE_USER_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  avatarUrl: true,
+} as const;
+
+const ASSIGNEE_INCLUDE = {
+  user: { select: ASSIGNEE_USER_SELECT },
+} as const;
+
+type AssigneeWithUser = Prisma.TaskAssigneeGetPayload<{
+  include: typeof ASSIGNEE_INCLUDE;
+}>;
+
+type TaskWithDetails = Task & {
+  subtasks: (Task & { assignees: AssigneeWithUser[] })[];
+  assignees: AssigneeWithUser[];
+};
 
 @Injectable()
 export class TasksService {
@@ -30,7 +49,7 @@ export class TasksService {
     workspaceId: string,
     userId: string,
     query: QueryTaskDto,
-  ): Promise<{ tasks: TaskWithSubtasks[]; total: number }> {
+  ): Promise<{ tasks: TaskWithDetails[]; total: number }> {
     const { role, canSeeAllTasks } = await assertMember(
       this.prisma,
       workspaceId,
@@ -81,7 +100,9 @@ export class TasksService {
           subtasks: {
             where: { deletedAt: null, ...visibility },
             orderBy: { createdAt: 'asc' },
+            include: { assignees: { include: ASSIGNEE_INCLUDE } },
           },
+          assignees: { include: ASSIGNEE_INCLUDE },
         },
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
         take: limit,
@@ -90,7 +111,7 @@ export class TasksService {
       this.prisma.task.count({ where }),
     ]);
 
-    return { tasks: tasks as TaskWithSubtasks[], total };
+    return { tasks: tasks as TaskWithDetails[], total };
   }
 
   async create(
@@ -98,13 +119,49 @@ export class TasksService {
     userId: string,
     dto: CreateTaskDto,
   ): Promise<Task> {
-    await assertMember(this.prisma, workspaceId, userId);
+    const { role } = await assertMember(this.prisma, workspaceId, userId);
 
     const statusId =
       dto.status ??
       (await this.taskStatuses.getDefaultOpenStatusId(workspaceId));
     await this.taskStatuses.assertStatusInWorkspace(workspaceId, statusId);
     const terminal = await this.taskStatuses.isTerminal(workspaceId, statusId);
+
+    // Build initial assignee list:
+    //   - subtask → inherit parent's assignees (preserve assignedById)
+    //   - explicit assigneeIds → owner/admin only, no self-assignment
+    let assigneeRows: { userId: string; assignedById: string }[] = [];
+
+    if (dto.parentTaskId) {
+      const parent = await this.prisma.task.findFirst({
+        where: { id: dto.parentTaskId, workspaceId, deletedAt: null },
+        include: { assignees: true },
+      });
+      if (!parent) throw new NotFoundException('Parent task not found');
+      assigneeRows = parent.assignees.map((a) => ({
+        userId: a.userId,
+        assignedById: a.assignedById,
+      }));
+    }
+
+    if (dto.assigneeIds && dto.assigneeIds.length > 0) {
+      if (role !== 'owner' && role !== 'admin') {
+        throw new ForbiddenException(
+          'Only owner or admin can assign tasks',
+        );
+      }
+      if (dto.assigneeIds.includes(userId)) {
+        throw new BadRequestException('Cannot assign a task to yourself');
+      }
+      await this.assertUsersInWorkspace(workspaceId, dto.assigneeIds);
+      const seen = new Set(assigneeRows.map((r) => r.userId));
+      for (const uid of dto.assigneeIds) {
+        if (!seen.has(uid)) {
+          assigneeRows.push({ userId: uid, assignedById: userId });
+          seen.add(uid);
+        }
+      }
+    }
 
     return this.prisma.task.create({
       data: {
@@ -120,15 +177,116 @@ export class TasksService {
         recurrenceRule: dto.recurrenceRule,
         projectId: dto.projectId,
         completedAt: terminal ? new Date() : undefined,
+        ...(assigneeRows.length > 0
+          ? { assignees: { createMany: { data: assigneeRows } } }
+          : {}),
       },
     });
+  }
+
+  private async assertUsersInWorkspace(
+    workspaceId: string,
+    userIds: string[],
+  ): Promise<void> {
+    const count = await this.prisma.workspaceMember.count({
+      where: { workspaceId, userId: { in: userIds } },
+    });
+    if (count !== userIds.length) {
+      throw new BadRequestException(
+        'One or more users are not members of this workspace',
+      );
+    }
+  }
+
+  async addAssignees(
+    workspaceId: string,
+    taskId: string,
+    requesterId: string,
+    userIds: string[],
+  ): Promise<TaskWithDetails> {
+    const { role } = await assertMember(
+      this.prisma,
+      workspaceId,
+      requesterId,
+    );
+    if (role !== 'owner' && role !== 'admin') {
+      throw new ForbiddenException('Only owner or admin can assign tasks');
+    }
+    if (userIds.includes(requesterId)) {
+      throw new BadRequestException('Cannot assign a task to yourself');
+    }
+    await this.assertUsersInWorkspace(workspaceId, userIds);
+
+    const task = await this.prisma.task.findFirst({
+      where: { id: taskId, workspaceId, deletedAt: null },
+    });
+    if (!task) throw new NotFoundException('Task not found');
+
+    await this.prisma.taskAssignee.createMany({
+      data: userIds.map((uid) => ({
+        taskId,
+        userId: uid,
+        assignedById: requesterId,
+      })),
+      skipDuplicates: true,
+    });
+
+    return this.fetchTaskWithDetails(workspaceId, taskId);
+  }
+
+  async removeAssignee(
+    workspaceId: string,
+    taskId: string,
+    requesterId: string,
+    targetUserId: string,
+  ): Promise<TaskWithDetails> {
+    const { role } = await assertMember(
+      this.prisma,
+      workspaceId,
+      requesterId,
+    );
+    if (role !== 'owner' && role !== 'admin') {
+      throw new ForbiddenException(
+        'Only owner or admin can remove assignees',
+      );
+    }
+
+    const task = await this.prisma.task.findFirst({
+      where: { id: taskId, workspaceId, deletedAt: null },
+    });
+    if (!task) throw new NotFoundException('Task not found');
+
+    await this.prisma.taskAssignee.deleteMany({
+      where: { taskId, userId: targetUserId },
+    });
+
+    return this.fetchTaskWithDetails(workspaceId, taskId);
+  }
+
+  private async fetchTaskWithDetails(
+    workspaceId: string,
+    taskId: string,
+  ): Promise<TaskWithDetails> {
+    const task = await this.prisma.task.findFirst({
+      where: { id: taskId, workspaceId, deletedAt: null },
+      include: {
+        subtasks: {
+          where: { deletedAt: null },
+          orderBy: { createdAt: 'asc' },
+          include: { assignees: { include: ASSIGNEE_INCLUDE } },
+        },
+        assignees: { include: ASSIGNEE_INCLUDE },
+      },
+    });
+    if (!task) throw new NotFoundException('Task not found');
+    return task as TaskWithDetails;
   }
 
   async findOne(
     workspaceId: string,
     id: string,
     userId: string,
-  ): Promise<TaskWithSubtasks> {
+  ): Promise<TaskWithDetails> {
     const { role, canSeeAllTasks } = await assertMember(
       this.prisma,
       workspaceId,
@@ -142,11 +300,13 @@ export class TasksService {
         subtasks: {
           where: { deletedAt: null, ...visibility },
           orderBy: { createdAt: 'asc' },
+          include: { assignees: { include: ASSIGNEE_INCLUDE } },
         },
+        assignees: { include: ASSIGNEE_INCLUDE },
       },
     });
     if (!task) throw new NotFoundException('Task not found');
-    return task as TaskWithSubtasks;
+    return task as TaskWithDetails;
   }
 
   async update(
