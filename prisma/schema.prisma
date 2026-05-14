@@ -29,6 +29,11 @@ model User {
   pushSubscriptions     PushSubscription[]
   calendarConnections   CalendarConnection[]
   bugReports            BugReport[]
+  createdTasks          Task[]                @relation("TaskCreator")
+  taskAssignments       TaskAssignee[]        @relation("AssignedTo")
+  taskAssignmentsGiven  TaskAssignee[]        @relation("AssignedBy")
+  taskComments          TaskComment[]
+  taskActivities        TaskActivity[]
 
   @@map("users")
 }
@@ -104,10 +109,11 @@ model BugReport {
 }
 
 model WorkspaceMember {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
-  workspaceId String   @map("workspace_id")
-  role        String   @default("member")
+  id             String  @id @default(uuid())
+  userId         String  @map("user_id")
+  workspaceId    String  @map("workspace_id")
+  role           String  @default("member")
+  canSeeAllTasks Boolean @default(false) @map("can_see_all_tasks")
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -158,6 +164,7 @@ model Project {
 model Task {
   id             String    @id @default(uuid())
   workspaceId    String    @map("workspace_id")
+  creatorId      String?   @map("creator_id")
   title          String
   description    String?
   dueDate        DateTime? @map("due_date") @db.Date
@@ -174,13 +181,17 @@ model Task {
   createdAt           DateTime  @default(now()) @map("created_at")
   deletedAt           DateTime? @map("deleted_at")
 
-  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  parentTask       Task?     @relation("Subtask", fields: [parentTaskId], references: [id])
-  subtasks         Task[]    @relation("Subtask")
-  recurrenceParent Task?     @relation("RecurringInstance", fields: [recurrenceParentId], references: [id])
-  recurrenceChildren Task[]  @relation("RecurringInstance")
-  notes            Note[]
-  project          Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  workspace          Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  creator            User?          @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  parentTask         Task?          @relation("Subtask", fields: [parentTaskId], references: [id])
+  subtasks           Task[]         @relation("Subtask")
+  recurrenceParent   Task?          @relation("RecurringInstance", fields: [recurrenceParentId], references: [id])
+  recurrenceChildren Task[]         @relation("RecurringInstance")
+  notes              Note[]
+  project            Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  assignees          TaskAssignee[]
+  comments           TaskComment[]
+  activities         TaskActivity[]
 
   @@index([workspaceId])
   @@index([workspaceId, status])
@@ -296,4 +307,50 @@ model CalendarConnection {
 
   @@unique([userId, provider])
   @@map("calendar_connections")
+}
+
+// --- Task assignment ---
+model TaskAssignee {
+  taskId       String   @map("task_id")
+  userId       String   @map("user_id")
+  assignedById String   @map("assigned_by_id")
+  assignedAt   DateTime @default(now()) @map("assigned_at")
+
+  task       Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user       User @relation("AssignedTo", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy User @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([userId])
+  @@map("task_assignees")
+}
+
+model TaskComment {
+  id        String   @id @default(uuid())
+  taskId    String   @map("task_id")
+  userId    String   @map("user_id")
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+  @@map("task_comments")
+}
+
+model TaskActivity {
+  id        String   @id @default(uuid())
+  taskId    String   @map("task_id")
+  userId    String   @map("user_id")
+  type      String   // assigned | unassigned | status_changed | due_date_changed | priority_changed | created
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+  @@map("task_activities")
 }
