@@ -59,7 +59,7 @@ describe('TasksService', () => {
     recurrenceRule: null,
     recurrenceParentId: null,
     projectId: null,
-    creatorId: null,
+    creatorId: USER,
     completedAt: null,
     focusMinutes: 0,
     deletedAt: null,

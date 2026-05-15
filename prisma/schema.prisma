@@ -164,7 +164,7 @@ model Project {
 model Task {
   id             String    @id @default(uuid())
   workspaceId    String    @map("workspace_id")
-  creatorId      String?   @map("creator_id")
+  creatorId      String    @map("creator_id")
   title          String
   description    String?
   dueDate        DateTime? @map("due_date") @db.Date
@@ -182,7 +182,7 @@ model Task {
   deletedAt           DateTime? @map("deleted_at")
 
   workspace          Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  creator            User?          @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  creator            User           @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Restrict)
   parentTask         Task?          @relation("Subtask", fields: [parentTaskId], references: [id])
   subtasks           Task[]         @relation("Subtask")
   recurrenceParent   Task?          @relation("RecurringInstance", fields: [recurrenceParentId], references: [id])
