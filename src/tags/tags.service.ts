@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, Note } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { membershipCache, membershipKey } from '../common/membership-cache';
+import { assertMember } from '../common/assert-member';
 
 const MAX_TAG_LENGTH = 40;
 
@@ -21,20 +21,6 @@ export class TagsService {
   private readonly logger = new Logger(TagsService.name);
 
   constructor(private readonly prisma: PrismaService) {}
-
-  private async assertMember(
-    workspaceId: string,
-    userId: string,
-  ): Promise<void> {
-    const key = membershipKey(userId, workspaceId);
-    if (membershipCache.get(key)) return;
-    const membership = await this.prisma.workspaceMember.findUnique({
-      where: { userId_workspaceId: { userId, workspaceId } },
-    });
-    if (!membership)
-      throw new ForbiddenException("You don't have access to this workspace");
-    membershipCache.set(key, true);
-  }
 
   /** Trim, lowercase, strip empty, enforce length, dedup while preserving order. */
   private normalizeTags(raw: string[]): string[] {
@@ -71,7 +57,7 @@ export class TagsService {
     userId: string,
     tags: string[],
   ): Promise<Note> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
     const incoming = this.normalizeTags(tags);
     if (!incoming.length) {
       throw new BadRequestException('No valid tags provided');
@@ -110,7 +96,7 @@ export class TagsService {
     userId: string,
     tag: string,
   ): Promise<Note> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
     const target = this.normalizeTag(tag);
 
     const note = await this.prisma.note.findFirst({
@@ -137,7 +123,7 @@ export class TagsService {
     workspaceId: string,
     userId: string,
   ): Promise<WorkspaceTagCount[]> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
 
     const rows = await this.prisma.$queryRaw<
       Array<{ tag: string; count: bigint | number }>
@@ -163,7 +149,7 @@ export class TagsService {
     from: string,
     to: string,
   ): Promise<{ renamed: number }> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
     const fromN = this.normalizeTag(from);
     const toN = this.normalizeTag(to);
     if (fromN === toN) return { renamed: 0 };
@@ -196,7 +182,7 @@ export class TagsService {
     userId: string,
     tag: string,
   ): Promise<{ affected: number }> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
     const target = this.normalizeTag(tag);
 
     const result = await this.prisma.$executeRaw(

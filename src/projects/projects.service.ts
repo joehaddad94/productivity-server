@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { membershipCache, membershipKey } from '../common/membership-cache';
+import { assertMember } from '../common/assert-member';
 import { Project } from '@prisma/client';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -16,26 +16,12 @@ type ProjectWithCount = Project & { _count: { notes: number; tasks: number } };
 export class ProjectsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async assertMember(
-    workspaceId: string,
-    userId: string,
-  ): Promise<void> {
-    const key = membershipKey(userId, workspaceId);
-    if (membershipCache.get(key)) return;
-    const membership = await this.prisma.workspaceMember.findUnique({
-      where: { userId_workspaceId: { userId, workspaceId } },
-    });
-    if (!membership)
-      throw new ForbiddenException("You don't have access to this workspace");
-    membershipCache.set(key, true);
-  }
-
   async list(
     workspaceId: string,
     userId: string,
     query: QueryProjectDto = {},
   ): Promise<{ projects: ProjectWithCount[]; total: number }> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
 
     const limit = query.limit ?? 50;
     const skip = query.skip ?? 0;
@@ -60,7 +46,7 @@ export class ProjectsService {
     userId: string,
     dto: CreateProjectDto,
   ): Promise<Project> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
 
     return this.prisma.project.create({
       data: {
@@ -78,7 +64,7 @@ export class ProjectsService {
     id: string,
     userId: string,
   ): Promise<ProjectWithCount> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
 
     const project = await this.prisma.project.findFirst({
       where: { id, workspaceId, deletedAt: null },

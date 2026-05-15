@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { membershipCache, membershipKey } from '../common/membership-cache';
+import { assertMember } from '../common/assert-member';
 import { Note } from '@prisma/client';
 import { CreateNoteDto } from './dto/create-note.dto';
 import { UpdateNoteDto } from './dto/update-note.dto';
@@ -17,27 +17,13 @@ export class NotesService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private async assertMember(
-    workspaceId: string,
-    userId: string,
-  ): Promise<void> {
-    const key = membershipKey(userId, workspaceId);
-    if (membershipCache.get(key)) return;
-    const membership = await this.prisma.workspaceMember.findUnique({
-      where: { userId_workspaceId: { userId, workspaceId } },
-    });
-    if (!membership)
-      throw new ForbiddenException("You don't have access to this workspace");
-    membershipCache.set(key, true);
-  }
-
   async list(
     workspaceId: string,
     userId: string,
     query: QueryNoteDto,
   ): Promise<{ notes: Note[]; total: number }> {
     const startedAt = Date.now();
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
 
     const tagList = query.tags
       ? query.tags
@@ -103,7 +89,7 @@ export class NotesService {
     dto: CreateNoteDto,
   ): Promise<Note> {
     const startedAt = Date.now();
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
 
     const note = await this.prisma.note.create({
       data: {
@@ -132,7 +118,7 @@ export class NotesService {
     id: string,
     userId: string,
   ): Promise<Note> {
-    await this.assertMember(workspaceId, userId);
+    await assertMember(this.prisma, workspaceId, userId);
 
     const note = await this.prisma.note.findFirst({
       where: { id, workspaceId },

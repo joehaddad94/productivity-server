@@ -23,17 +23,23 @@ import {
 } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TasksService } from './tasks.service';
+import { CommentsService } from './comments.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { QueryTaskDto } from './dto/query-task.dto';
 import { BulkTaskDto } from './dto/bulk-task.dto';
+import { AssignTaskDto } from './dto/assign-task.dto';
+import { CreateCommentDto } from './dto/create-comment.dto';
 
 @ApiTags('tasks')
 @Controller('workspaces/:workspaceId/tasks')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class TasksController {
-  constructor(private readonly tasksService: TasksService) {}
+  constructor(
+    private readonly tasksService: TasksService,
+    private readonly commentsService: CommentsService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'List top-level tasks with nested subtasks' })
@@ -144,5 +150,88 @@ export class TasksController {
   ) {
     await this.tasksService.reorder(workspaceId, user.id, body.ids);
     return { success: true };
+  }
+
+  @Post(':id/assign')
+  @ApiOperation({ summary: 'Add assignees to a task (owner/admin only)' })
+  @ApiResponse({ status: 201, description: 'Assignees added' })
+  @ApiResponse({ status: 403, description: 'Owner/admin only' })
+  @ApiResponse({ status: 404, description: 'Task not found' })
+  async assign(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: RequestUser,
+    @Body() dto: AssignTaskDto,
+  ) {
+    const task = await this.tasksService.addAssignees(
+      workspaceId,
+      id,
+      user.id,
+      dto.userIds,
+    );
+    return { task };
+  }
+
+  @Get(':id/comments')
+  @ApiOperation({ summary: 'Get unified comments + activity thread for a task' })
+  @ApiResponse({ status: 200, description: 'Thread items' })
+  async getThread(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    const thread = await this.commentsService.getThread(workspaceId, id, user.id);
+    return { thread };
+  }
+
+  @Post(':id/comments')
+  @ApiOperation({ summary: 'Post a comment on a task (owner/admin/assignee)' })
+  @ApiResponse({ status: 201, description: 'Comment created' })
+  async createComment(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: RequestUser,
+    @Body() dto: CreateCommentDto,
+  ) {
+    const item = await this.commentsService.createComment(
+      workspaceId,
+      id,
+      user.id,
+      dto.content,
+    );
+    return { item };
+  }
+
+  @Delete(':id/comments/:commentId')
+  @ApiOperation({ summary: 'Delete your own comment' })
+  @ApiResponse({ status: 200, description: 'Comment deleted' })
+  async deleteComment(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('commentId', ParseUUIDPipe) commentId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    await this.commentsService.deleteComment(workspaceId, id, commentId, user.id);
+    return { success: true };
+  }
+
+  @Delete(':id/assign/:userId')
+  @ApiOperation({ summary: 'Remove an assignee from a task (owner/admin only)' })
+  @ApiResponse({ status: 200, description: 'Assignee removed' })
+  @ApiResponse({ status: 403, description: 'Owner/admin only' })
+  @ApiResponse({ status: 404, description: 'Task not found' })
+  async unassign(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('userId', ParseUUIDPipe) targetUserId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    const task = await this.tasksService.removeAssignee(
+      workspaceId,
+      id,
+      user.id,
+      targetUserId,
+    );
+    return { task };
   }
 }

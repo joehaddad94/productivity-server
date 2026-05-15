@@ -5,6 +5,7 @@ import { TaskStatusesModule } from '../task-statuses/task-statuses.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { TasksController } from './tasks.controller';
 import { TasksService } from './tasks.service';
+import { CommentsService } from './comments.service';
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { TasksService } from './tasks.service';
     NotificationsModule,
   ],
   controllers: [TasksController],
-  providers: [TasksService],
-  exports: [TasksService],
+  providers: [TasksService, CommentsService],
+  exports: [TasksService, CommentsService],
 })
 export class TasksModule {}

@@ -59,6 +59,7 @@ describe('TasksService', () => {
     recurrenceRule: null,
     recurrenceParentId: null,
     projectId: null,
+    creatorId: USER,
     completedAt: null,
     focusMinutes: 0,
     deletedAt: null,
@@ -83,8 +84,17 @@ describe('TasksService', () => {
         update: jest.fn(),
         updateMany: jest.fn(),
       },
+      taskAssignee: {
+        findMany: jest.fn(),
+        createMany: jest.fn(),
+        deleteMany: jest.fn(),
+      },
+      taskActivity: {
+        create: jest.fn().mockResolvedValue(undefined),
+      },
       user: {
         findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       $transaction: jest.fn(),
     };
@@ -116,8 +126,12 @@ describe('TasksService', () => {
     notifications = module.get(NotificationsService);
     jest.clearAllMocks();
 
-    // Default: user is a member
-    prisma.workspaceMember.findUnique.mockResolvedValue({ id: 'm-1' });
+    // Default: user is a member with canSeeAllTasks=true (so visibility filter is empty)
+    prisma.workspaceMember.findUnique.mockResolvedValue({
+      id: 'm-1',
+      role: 'member',
+      canSeeAllTasks: true,
+    });
     taskStatuses.getDefaultOpenStatusId.mockResolvedValue(OPEN_STATUS);
     taskStatuses.assertStatusInWorkspace.mockResolvedValue(undefined);
     taskStatuses.isTerminal.mockResolvedValue(false);
@@ -657,6 +671,11 @@ describe('TasksService', () => {
     });
 
     it('calls $transaction with sortOrder updates for each id', async () => {
+      prisma.task.findMany.mockResolvedValue([
+        { id: 'task-a' },
+        { id: 'task-b' },
+        { id: 'task-c' },
+      ]);
       prisma.$transaction.mockResolvedValue([]);
 
       await service.reorder(WS, USER, ['task-a', 'task-b', 'task-c']);

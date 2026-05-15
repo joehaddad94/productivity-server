@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { TaskStatusesService } from '../task-statuses/task-statuses.service';
 import { NotificationsService } from './notifications.service';
+import { buildTaskRelevanceWhere } from '../tasks/task-visibility';
 
 function getLocalHour(timezone: string | null | undefined): number {
   const tz = timezone ?? 'UTC';
@@ -112,6 +113,7 @@ export class NotificationsScheduler {
     );
     const notDone =
       terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
+    const relevance = buildTaskRelevanceWhere(member.userId);
 
     const [dueTodayCount, overdueCount] = await Promise.all([
       this.prisma.task.count({
@@ -120,6 +122,7 @@ export class NotificationsScheduler {
           dueDate: { gte: today, lt: tomorrow },
           ...notDone,
           deletedAt: null,
+          ...relevance,
         },
       }),
       this.prisma.task.count({
@@ -128,6 +131,7 @@ export class NotificationsScheduler {
           dueDate: { lt: today },
           ...notDone,
           deletedAt: null,
+          ...relevance,
         },
       }),
     ]);
@@ -164,6 +168,7 @@ export class NotificationsScheduler {
     );
     const notDone =
       terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
+    const relevance = buildTaskRelevanceWhere(member.userId);
 
     const overdueTasks = await this.prisma.task.findMany({
       where: {
@@ -171,6 +176,7 @@ export class NotificationsScheduler {
         dueDate: { lt: today },
         ...notDone,
         deletedAt: null,
+        ...relevance,
       },
       take: 5,
       orderBy: { dueDate: 'asc' },
@@ -213,6 +219,7 @@ export class NotificationsScheduler {
     );
     const notDone =
       terminalIds.length > 0 ? { status: { notIn: terminalIds } } : {};
+    const relevance = buildTaskRelevanceWhere(member.userId);
 
     const dueTasks = await this.prisma.task.findMany({
       where: {
@@ -220,6 +227,7 @@ export class NotificationsScheduler {
         dueDate: { gte: today, lt: tomorrow },
         ...notDone,
         deletedAt: null,
+        ...relevance,
       },
       take: 5,
       orderBy: { priority: 'desc' },

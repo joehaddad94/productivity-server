@@ -47,6 +47,23 @@ export class AnalyticsController {
     return { analytics };
   }
 
+  @Get('team')
+  @ApiOperation({ summary: 'Get per-member analytics (owner/admin only)' })
+  @ApiResponse({ status: 200, description: 'Per-member totals' })
+  @ApiResponse({ status: 403, description: 'Owner/admin only' })
+  async getTeamAnalytics(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @CurrentUser() user: RequestUser,
+    @Query() query: QueryAnalyticsDto,
+  ) {
+    const members = await this.analyticsService.getTeamAnalytics(
+      workspaceId,
+      user.id,
+      query,
+    );
+    return { members };
+  }
+
   @Post('log')
   @ApiOperation({ summary: 'Log or upsert daily stats' })
   @ApiResponse({ status: 201, description: 'Stat logged' })
