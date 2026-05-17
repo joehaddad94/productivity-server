@@ -568,16 +568,37 @@ export class TasksService {
     userId: string,
     minutes: number,
   ): Promise<Task> {
-    await this.findOne(workspaceId, id, userId);
-    const updated = await this.prisma.task.update({
-      where: { id },
-      data: { focusMinutes: { increment: minutes } },
+    // Lightweight membership + existence check — no need for the full
+    // findOne (which fetches subtasks/assignees and runs visibility filters).
+    await assertMember(this.prisma, workspaceId, userId);
+    const exists = await this.prisma.task.findFirst({
+      where: { id, workspaceId, deletedAt: null },
+      select: { id: true },
     });
-    if (minutes > 0) {
-      await this.analytics.logStat(workspaceId, userId, {
-        focusMinutes: minutes,
-      });
-    }
+    if (!exists) throw new NotFoundException('Task not found');
+
+    // Parallelize the update and the analytics upsert.
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    const [updated] = await Promise.all([
+      this.prisma.task.update({
+        where: { id },
+        data: { focusMinutes: { increment: minutes } },
+      }),
+      minutes > 0
+        ? this.prisma.dailyStat.upsert({
+            where: { workspaceId_userId_date: { workspaceId, userId, date } },
+            update: { focusMinutes: { increment: minutes } },
+            create: {
+              workspaceId,
+              userId,
+              date,
+              focusMinutes: minutes,
+              tasksCompleted: 0,
+            },
+          })
+        : Promise.resolve(null),
+    ]);
     return updated;
   }
 
@@ -610,14 +631,31 @@ export class TasksService {
     const visibleIds = new Set(visibleTasks.map((t) => t.id));
     const orderedVisibleIds = ids.filter((id) => visibleIds.has(id));
 
-    await this.prisma.$transaction(
-      orderedVisibleIds.map((id, index) =>
-        this.prisma.task.update({
-          where: { id, workspaceId },
-          data: { sortOrder: index },
-        }),
-      ),
-    );
+    if (orderedVisibleIds.length === 0) return;
+
+    // Single UPDATE with a CASE WHEN per id — one round-trip regardless of list size.
+    // N sequential updates inside $transaction would hit the 5-second timeout at ~20+ tasks.
+    //
+    // IDs are interpolated into raw SQL; guard against injection even though they
+    // already passed through findMany (which returned real DB rows).
+    const uuidRe =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const safeIds = orderedVisibleIds.filter((id) => uuidRe.test(id));
+    if (safeIds.length === 0) return;
+
+    const cases = safeIds
+      .map((id, index) => `WHEN id = '${id}' THEN ${index}`)
+      .join('\n        ');
+    const idList = safeIds.map((id) => `'${id}'`).join(', ');
+
+    await this.prisma.$executeRawUnsafe(`
+      UPDATE tasks
+      SET sort_order = CASE
+        ${cases}
+      END
+      WHERE id IN (${idList})
+        AND workspace_id = '${workspaceId}'
+    `);
   }
 
   async bulkUpdate(
