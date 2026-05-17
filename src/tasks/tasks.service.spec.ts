@@ -92,6 +92,9 @@ describe('TasksService', () => {
       taskActivity: {
         create: jest.fn().mockResolvedValue(undefined),
       },
+      dailyStat: {
+        upsert: jest.fn().mockResolvedValue(undefined),
+      },
       user: {
         findUnique: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
@@ -620,13 +623,15 @@ describe('TasksService', () => {
     it('logs analytics for positive minutes', async () => {
       prisma.task.findFirst.mockResolvedValue(makeTask());
       prisma.task.update.mockResolvedValue(makeTask({ focusMinutes: 25 }));
-      analytics.logStat.mockResolvedValue(undefined as never);
 
       await service.logFocus(WS, 'task-1', USER, 25);
 
-      expect(analytics.logStat).toHaveBeenCalledWith(WS, USER, {
-        focusMinutes: 25,
-      });
+      expect((prisma as any).dailyStat.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: { focusMinutes: { increment: 25 } },
+          create: expect.objectContaining({ workspaceId: WS, userId: USER, focusMinutes: 25 }),
+        }),
+      );
     });
 
     it('does not log analytics when minutes is 0', async () => {
@@ -635,7 +640,7 @@ describe('TasksService', () => {
 
       await service.logFocus(WS, 'task-1', USER, 0);
 
-      expect(analytics.logStat).not.toHaveBeenCalled();
+      expect((prisma as any).dailyStat.upsert).not.toHaveBeenCalled();
     });
   });
 

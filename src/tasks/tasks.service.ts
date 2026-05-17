@@ -568,16 +568,37 @@ export class TasksService {
     userId: string,
     minutes: number,
   ): Promise<Task> {
-    await this.findOne(workspaceId, id, userId);
-    const updated = await this.prisma.task.update({
-      where: { id },
-      data: { focusMinutes: { increment: minutes } },
+    // Lightweight membership + existence check — no need for the full
+    // findOne (which fetches subtasks/assignees and runs visibility filters).
+    await assertMember(this.prisma, workspaceId, userId);
+    const exists = await this.prisma.task.findFirst({
+      where: { id, workspaceId, deletedAt: null },
+      select: { id: true },
     });
-    if (minutes > 0) {
-      await this.analytics.logStat(workspaceId, userId, {
-        focusMinutes: minutes,
-      });
-    }
+    if (!exists) throw new NotFoundException('Task not found');
+
+    // Parallelize the update and the analytics upsert.
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    const [updated] = await Promise.all([
+      this.prisma.task.update({
+        where: { id },
+        data: { focusMinutes: { increment: minutes } },
+      }),
+      minutes > 0
+        ? this.prisma.dailyStat.upsert({
+            where: { workspaceId_userId_date: { workspaceId, userId, date } },
+            update: { focusMinutes: { increment: minutes } },
+            create: {
+              workspaceId,
+              userId,
+              date,
+              focusMinutes: minutes,
+              tasksCompleted: 0,
+            },
+          })
+        : Promise.resolve(null),
+    ]);
     return updated;
   }
 
