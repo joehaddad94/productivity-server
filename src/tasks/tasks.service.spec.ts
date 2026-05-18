@@ -45,7 +45,7 @@ describe('TasksService', () => {
   const OPEN_STATUS = 'status-open';
   const DONE_STATUS = 'status-done';
 
-  const makeTask = (overrides: Partial<Task> = {}): Task & { subtasks: Task[] } => ({
+  const makeTask = (overrides: Partial<Task> = {}): Task & { subtasks: Task[]; assignees: any[] } => ({
     id: 'task-1',
     workspaceId: WS,
     title: 'My Task',
@@ -65,6 +65,7 @@ describe('TasksService', () => {
     deletedAt: null,
     createdAt: new Date(),
     subtasks: [],
+    assignees: [],
     ...overrides,
   });
 
@@ -100,6 +101,7 @@ describe('TasksService', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
       $transaction: jest.fn(),
+      $executeRawUnsafe: jest.fn().mockResolvedValue(0),
     };
 
     const mockAnalytics = { logStat: jest.fn() };
@@ -675,17 +677,23 @@ describe('TasksService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('calls $transaction with sortOrder updates for each id', async () => {
+    it('calls $executeRawUnsafe with CASE WHEN sortOrder updates for each id', async () => {
       prisma.task.findMany.mockResolvedValue([
-        { id: 'task-a' },
-        { id: 'task-b' },
-        { id: 'task-c' },
+        { id: '00000000-0000-0000-0000-000000000001' },
+        { id: '00000000-0000-0000-0000-000000000002' },
+        { id: '00000000-0000-0000-0000-000000000003' },
       ]);
-      prisma.$transaction.mockResolvedValue([]);
 
-      await service.reorder(WS, USER, ['task-a', 'task-b', 'task-c']);
+      await service.reorder(WS, USER, [
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000002',
+        '00000000-0000-0000-0000-000000000003',
+      ]);
 
-      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect((prisma as any).$executeRawUnsafe).toHaveBeenCalledTimes(1);
+      expect((prisma as any).$executeRawUnsafe).toHaveBeenCalledWith(
+        expect.stringContaining('CASE'),
+      );
     });
   });
 
