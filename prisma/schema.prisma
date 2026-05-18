@@ -34,8 +34,23 @@ model User {
   taskAssignmentsGiven  TaskAssignee[]        @relation("AssignedBy")
   taskComments          TaskComment[]
   taskActivities        TaskActivity[]
+  timerState            UserTimerState?
 
   @@map("users")
+}
+
+model UserTimerState {
+  userId            String    @id @map("user_id")
+  sessionType       String    @default("work") @map("session_type")
+  startedAt         DateTime? @map("started_at")
+  secondsLeft       Int       @default(1500) @map("seconds_left")
+  sessionCount      Int       @default(0) @map("session_count")
+  totalFocusMinutes Int       @default(0) @map("total_focus_minutes")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_timer_states")
 }
 
 model VerificationToken {

@@ -19,6 +19,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CalendarConnectionsModule } from './calendar-connections/calendar-connections.module';
 import { BugReportsModule } from './bug-reports/bug-reports.module';
+import { TimerStateModule } from './timer-state/timer-state.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { BugReportsModule } from './bug-reports/bug-reports.module';
     NotificationsModule,
     CalendarConnectionsModule,
     BugReportsModule,
+    TimerStateModule,
   ],
   controllers: [AppController],
   providers: [

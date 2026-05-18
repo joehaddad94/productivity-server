@@ -1,7 +1,7 @@
 import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsOptional, Min, ValidateIf } from 'class-validator';
+import { IsInt, IsOptional, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { CreateTaskDto, RecurrenceRule } from './create-task.dto';
+import { CreateTaskDto } from './create-task.dto';
 
 export class UpdateTaskDto extends PartialType(CreateTaskDto) {
   @ApiPropertyOptional({ description: 'Manual sort order (lower = earlier)' })
@@ -10,11 +10,4 @@ export class UpdateTaskDto extends PartialType(CreateTaskDto) {
   @Min(0)
   @Type(() => Number)
   sortOrder?: number;
-
-  // Override to allow null (clears the recurrence rule)
-  @ApiPropertyOptional({ enum: RecurrenceRule, nullable: true })
-  @IsOptional()
-  @ValidateIf((o) => o.recurrenceRule !== null)
-  @IsEnum(RecurrenceRule)
-  recurrenceRule?: RecurrenceRule | null;
 }
