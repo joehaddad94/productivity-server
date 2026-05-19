@@ -522,7 +522,7 @@ export class TasksService {
   }
 
   private async spawnNextRecurrence(
-    task: Task,
+    task: TaskWithDetails,
     workspaceId: string,
   ): Promise<void> {
     const rule = task.recurrenceRule as RecurrenceRule | null;
@@ -538,14 +538,19 @@ export class TasksService {
       nextDue = new Date(currentDue);
       nextDue.setDate(nextDue.getDate() + 7);
     } else {
+      // Clamp to last valid day of next month (e.g. Jan 31 → Feb 28, not Mar 3)
+      const day = currentDue.getDate();
       nextDue = new Date(currentDue);
+      nextDue.setDate(1);
       nextDue.setMonth(nextDue.getMonth() + 1);
+      const maxDay = new Date(nextDue.getFullYear(), nextDue.getMonth() + 1, 0).getDate();
+      nextDue.setDate(Math.min(day, maxDay));
     }
 
     const openStatusId =
       await this.taskStatuses.getDefaultOpenStatusId(workspaceId);
 
-    await this.prisma.task.create({
+    const created = await this.prisma.task.create({
       data: {
         workspaceId,
         creatorId: task.creatorId,
@@ -558,8 +563,19 @@ export class TasksService {
         recurrenceRule: rule,
         recurrenceParentId: task.id,
         sortOrder: task.sortOrder ?? 0,
+        projectId: task.projectId ?? null,
       },
     });
+
+    if (task.assignees.length > 0) {
+      await this.prisma.taskAssignee.createMany({
+        data: task.assignees.map((a) => ({
+          taskId: created.id,
+          userId: a.userId,
+          assignedById: task.creatorId,
+        })),
+      });
+    }
   }
 
   async logFocus(
@@ -604,9 +620,11 @@ export class TasksService {
 
   async remove(workspaceId: string, id: string, userId: string): Promise<void> {
     await this.findOne(workspaceId, id, userId);
-    await this.prisma.task.update({
-      where: { id },
-      data: { deletedAt: new Date() },
+    const now = new Date();
+    await this.prisma.task.update({ where: { id }, data: { deletedAt: now } });
+    await this.prisma.task.updateMany({
+      where: { recurrenceParentId: id, workspaceId, deletedAt: null },
+      data: { deletedAt: now },
     });
   }
 

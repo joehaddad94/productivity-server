@@ -139,3 +139,45 @@ Changes:
 - `/tasks` dropped from 1344ms → 526ms (**-818ms**), `/notes` from 1043ms → 260ms (**-783ms**), `/projects` from 1073ms → 264ms (**-809ms**).
 - All list endpoints now sit at ~260ms (1 round-trip) or ~530ms (2 round-trips). The floor is remote Supabase latency.
 - Remaining outlier: `GET /workspaces/:id/notifications` still ~1.1s — heavier join. Everything else is at or near the network floor.
+
+
+---
+
+## 2026-05-18 — Focus time logging fix
+
+**Change:** `POST /tasks/:id/log-focus` replaced `findOne` (full task with subtasks/assignees) with a lightweight existence check, and parallelised the two writes (`task.update` + `dailyStat.upsert`).
+
+| Scenario | Before | After |
+|---|---:|---:|
+| `POST /tasks/:id/log-focus` | ~4–5s | ~500ms |
+
+**Root cause:** `findOne` fetched the full task graph (subtasks + assignees via JOINs, ~1.5–2s) just to verify the task existed. Then two more sequential DB writes followed. Five round-trips total.  
+**Fix:** one `assertMember` (cached), one `findFirst` with `select: {id}`, two parallel writes.
+
+---
+
+## 2026-05-18 — Task reorder fix
+
+**Change:** `POST /tasks/reorder` replaced `$transaction([N × task.update])` with a single `UPDATE ... CASE WHEN` raw query.
+
+| Scenario | Before | After |
+|---|---:|---:|
+| Reorder 32 tasks | 500 error (timeout) | 586ms |
+
+**Root cause:** Prisma's `$transaction` runs operations sequentially. 32 updates × ~250ms remote latency = ~8s, exceeding the 5-second transaction timeout.  
+**Fix:** single SQL statement, one round-trip regardless of task count.
+
+---
+
+## 2026-05-18 — Tasks page load: project embedding
+
+**Change:** `GET /tasks` now includes `project: { id, name }` in each task, eliminating the separate `GET /projects` request on page load.
+
+| Request | P50 |
+|---|---:|
+| `GET /tasks` (before embed) | 1575ms |
+| `GET /projects` (eliminated) | 266ms |
+| `GET /tasks` (after embed) | ~1579ms |
+
+**Net effect:** one fewer request on page load. Cost of the additional JOIN is ~4ms — negligible against the remote Supabase latency floor.  
+Projects are now fetched lazily only when a picker that needs the full list is opened (filter dropdown, task drawer, create modal).

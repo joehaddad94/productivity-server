@@ -9,6 +9,7 @@ import {
   Matches,
   MaxLength,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export enum RecurrenceRule {
@@ -64,10 +65,11 @@ export class CreateTaskDto {
   @IsUUID()
   parentTaskId?: string;
 
-  @ApiPropertyOptional({ enum: RecurrenceRule })
+  @ApiPropertyOptional({ enum: RecurrenceRule, nullable: true })
   @IsOptional()
+  @ValidateIf((o) => o.recurrenceRule !== null)
   @IsEnum(RecurrenceRule)
-  recurrenceRule?: RecurrenceRule;
+  recurrenceRule?: RecurrenceRule | null;
 
   @ApiPropertyOptional()
   @IsOptional()

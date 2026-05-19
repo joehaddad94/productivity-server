@@ -1,18 +1,22 @@
 # CLAUDE.md — Agent Workflow Rules
 
 ## Repo layout
-- **Client**: `C:\Users\Joe\Desktop\productivity-client` (Next.js, branch `agent`)
-- **Server**: `C:\Users\Joe\Desktop\productivity-server` (NestJS, branch `agent`)
+- **Client**: `C:\Users\Joe\Desktop\productivity-client` (Next.js)
+- **Server**: `C:\Users\Joe\Desktop\productivity-server` (NestJS)
 
-## Branch & PR rules (permit/notify flow)
-1. All work goes on the **`agent`** branch of the respective repo.
+## Active branches (as of 2026-05-18)
+- `general` — client working branch
+- `optimizations` — server working branch
+- `development` — integration branch (both repos)
+- `main` — stable release
+
+## Branch & PR rules
+1. All work goes on the active branch of the respective repo.
 2. When ready to push a completed feature:
    - `git add -A && git commit -m "<conventional commit message>"`
-   - `git push origin agent`
-   - Open a PR **agent → development** on GitHub via the API (title = commit subject).
+   - `git push origin <branch>`
+   - Open a PR **branch → development** on GitHub via the API.
 3. **Never force-push.** Never push directly to `main` or `development`.
-4. After opening the PR, update `C:\Users\Joe\.claude\projects\...\memory\progress.md`
-   with the feature status and PR link.
 
 ## Commit message convention
 `feat(<scope>): <description>` / `fix(<scope>): <description>` / `chore(<scope>): <description>`
@@ -21,36 +25,44 @@
 `src/<feature>/<feature>.module.ts|controller.ts|service.ts|dto/`
 
 ## Shell note
-Use PowerShell or cmd.exe for all commands — NOT Git Bash / WSL.
-`gh` CLI is not available; use `git` only for VCS. Use the GitHub REST API (via the
-provided MCP tools or curl with the token in env) to open PRs.
+Use PowerShell or cmd.exe — NOT Git Bash / WSL.
+`gh` CLI is not available; use `git` for VCS and GitHub REST API for PRs.
 
-## Current backlog (in priority order)
-1. ~~Pomodoro per-task focus minutes~~ ✅
-2. **Notifications & Reminders** (next — see below)
-3. Recurring tasks
-4. Team / workspace sharing
+## Performance rules (learned from benchmarks)
+- Never put N sequential Prisma calls inside `$transaction` — use a raw `CASE WHEN` query or `Promise.all` instead
+- For existence checks, use `findFirst` with `select: { id: true }` — never `findOne` which fetches full relations
+- Parallelise independent DB writes with `Promise.all`
+- assertMember is cached (TTL 60s) — calling it twice in one request is free on cache hits
 
-## Notifications & Reminders — spec
-### Server (`productivity-server`, NestJS)
-- Install `@nestjs/schedule` + `node-cron`; add `ScheduleModule.forRoot()` to `AppModule`
-- `NotificationsModule` with:
-  - `Notification` Prisma model: `id, userId, taskId?, title, body, type (DUE_SOON|OVERDUE|DAILY_AGENDA), read, createdAt`
-  - Migration: `add_notifications_table`
-  - `NotificationsService`:
-    - `getUserNotifications(userId)` — list unread, newest first
-    - `markRead(id, userId)` — mark single notification read
-    - `markAllRead(userId)`
-    - `createNotification(dto)` — internal
-  - `NotificationsController`: `GET /notifications`, `PATCH /notifications/:id/read`, `PATCH /notifications/read-all`
-  - `RemindersScheduler` (`@Injectable()`, uses `@Cron`):
-    - Every minute: find tasks with `dueDate` within the next 60 min + no `DUE_SOON` notification today → create notification
-    - Every minute: find tasks with `dueDate` < now + no `OVERDUE` notification today → create notification
-    - Daily at 08:00 Beirut time (`@Cron('0 8 * * *', { timeZone: 'Asia/Beirut' })`): per-user daily agenda summary
-- Unit test `RemindersScheduler` with mocked `PrismaService` and mocked `Date`
+## Useful scripts
+- `npm run otel:test-connection` — verify Grafana OTLP endpoint is reachable
+- `npm run otel:test-export` — send a real span to Grafana and confirm it arrives
+- `npm run grafana:check-data` — query live Prometheus metrics for tasky-server
+- `npm run grafana:sync-dashboard` — push the API performance dashboard to Grafana Cloud
+- `node scripts/benchmark-tasks-vs-projects.mjs` — compare endpoint response times
 
-### Client (`productivity-client`, Next.js)
-- `Notification` type + `notificationsApi` + hooks
-- Bell icon in header with unread badge, dropdown panel, mark-all-read
-- Settings page: replace "coming soon" placeholder with real notification preference toggles
-- e2e: `e2e/notifications.spec.ts`
+## What's been built (all shipped)
+- Roles: owner / admin / member with permission guards
+- Task assignment with visibility filtering
+- Member management UI
+- Assignment notifications + due-date reminders
+- Comments & activity log per task
+- Team analytics tab
+- Recurring tasks
+- Google + Microsoft Calendar OAuth
+- Notifications (in-app bell, push, email)
+- Pomodoro per-task focus minutes
+- Sentry error monitoring
+- Rate limiting (`@nestjs/throttler`)
+- TTL caching for JWT sessions and workspace membership
+- Composite DB indexes
+- Parallel DB queries on all list endpoints
+- OpenTelemetry → Grafana Cloud (traces + metrics)
+- `project { id, name }` embedded in task list response
+
+## Pending
+- CSP headers (helmet not installed)
+- CI/CD pipeline (GitHub Actions)
+- Marketing site pages (`/`, `/features`, `/pricing`, `/docs`)
+- In-app onboarding modal
+- API retry logic on the client
