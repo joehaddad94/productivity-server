@@ -193,6 +193,8 @@ model Task {
   recurrenceRule      String?   @map("recurrence_rule")
   recurrenceParentId  String?   @map("recurrence_parent_id")
   projectId           String?   @map("project_id")
+  remindAt            DateTime? @map("remind_at")
+  remindSentAt        DateTime? @map("remind_sent_at")
   createdAt           DateTime  @default(now()) @map("created_at")
   deletedAt           DateTime? @map("deleted_at")
 
@@ -213,6 +215,7 @@ model Task {
   @@index([parentTaskId])
   @@index([workspaceId, projectId])
   @@index([workspaceId, deletedAt])
+  @@index([remindAt, remindSentAt])
   @@map("tasks")
 }
 

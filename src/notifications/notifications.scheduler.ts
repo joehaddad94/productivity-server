@@ -61,6 +61,83 @@ export class NotificationsScheduler {
     private readonly taskStatuses: TaskStatusesService,
   ) {}
 
+  /** Runs every minute — fires task reminders within a 5-minute grace window */
+  @Cron('* * * * *')
+  async runReminderCheck() {
+    const now = new Date();
+    const gracePast = new Date(now.getTime() - 5 * 60 * 1000);
+
+    // Find all tasks whose reminder is due and hasn't been sent yet
+    const tasks = await this.prisma.task.findMany({
+      where: {
+        remindAt: { gt: gracePast, lte: now },
+        remindSentAt: null,
+        deletedAt: null,
+      },
+      include: {
+        assignees: { include: { user: true } },
+      },
+    });
+
+    if (tasks.length === 0) return;
+
+    // Collect terminal status IDs per workspace (cached per run)
+    const terminalByWorkspace = new Map<string, Set<string>>();
+    async function getTerminalIds(
+      taskStatuses: TaskStatusesService,
+      workspaceId: string,
+    ): Promise<Set<string>> {
+      if (!terminalByWorkspace.has(workspaceId)) {
+        const ids = await taskStatuses.terminalStatusIds(workspaceId);
+        terminalByWorkspace.set(workspaceId, new Set(ids));
+      }
+      return terminalByWorkspace.get(workspaceId)!;
+    }
+
+    for (const task of tasks) {
+      // Mark sent immediately to prevent re-firing on next tick even if delivery fails
+      await this.prisma.task.update({
+        where: { id: task.id },
+        data: { remindSentAt: now },
+      });
+
+      // Skip if task is already in a terminal (completed) status
+      const terminalIds = await getTerminalIds(
+        this.taskStatuses,
+        task.workspaceId,
+      );
+      if (terminalIds.has(task.status)) continue;
+
+      // Collect unique user IDs to notify: creator + all assignees
+      const userIds = new Set<string>([task.creatorId]);
+      for (const a of task.assignees) userIds.add(a.userId);
+
+      for (const userId of userIds) {
+        const settings = await this.notifications.getSettings(userId);
+        // If the user has no channel enabled, skip — still marked as sent above
+        if (!settings.inApp && !settings.email && !settings.push) continue;
+
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { email: true, timezone: true },
+        });
+        if (!user) continue;
+
+        await this.notifications.createAndDeliver({
+          userId,
+          workspaceId: task.workspaceId,
+          taskId: task.id,
+          type: 'reminder',
+          title: 'Reminder',
+          body: `"${task.title}"`,
+          userEmail: user.email,
+          userTimezone: user.timezone,
+          url: `/tasks`,
+        });
+      }
+    }
+  }
+
   /** Runs every hour — dispatches per-user jobs based on their local time */
   @Cron('0 * * * *')
   async hourlyDispatch() {
