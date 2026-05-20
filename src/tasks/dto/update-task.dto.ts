@@ -1,5 +1,5 @@
 import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsInt, IsOptional, Min } from 'class-validator';
+import { IsDateString, IsInt, IsOptional, Min, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateTaskDto } from './create-task.dto';
 
@@ -10,4 +10,13 @@ export class UpdateTaskDto extends PartialType(CreateTaskDto) {
   @Min(0)
   @Type(() => Number)
   sortOrder?: number;
+
+  @ApiPropertyOptional({
+    description: 'UTC ISO datetime to fire a reminder notification. Null clears it.',
+    nullable: true,
+  })
+  @IsOptional()
+  @ValidateIf((o) => o.remindAt !== null)
+  @IsDateString()
+  remindAt?: string | null;
 }

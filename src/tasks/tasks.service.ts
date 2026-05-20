@@ -442,6 +442,13 @@ export class TasksService {
         ...(dto.projectId !== undefined
           ? { projectId: dto.projectId ?? null }
           : {}),
+        ...(dto.remindAt !== undefined
+          ? {
+              remindAt: dto.remindAt ? new Date(dto.remindAt) : null,
+              // Clear sent flag so the reminder fires again if rescheduled
+              remindSentAt: null,
+            }
+          : {}),
         ...(completedAtPatch !== undefined
           ? { completedAt: completedAtPatch }
           : {}),
@@ -564,6 +571,9 @@ export class TasksService {
         recurrenceParentId: task.id,
         sortOrder: task.sortOrder ?? 0,
         projectId: task.projectId ?? null,
+        // Reminders are personal to the original task — not carried forward
+        remindAt: null,
+        remindSentAt: null,
       },
     });
 
