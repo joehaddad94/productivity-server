@@ -210,8 +210,7 @@ export class WorkspacesService {
 
       // Send notification email
       const appUrl =
-        this.config.get<string>('NEXT_PUBLIC_APP_URL') ??
-        'https://app.tasky.io';
+        this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
       await this.mail.sendInviteEmail(
         dto.email,
         workspace.name,
@@ -224,7 +223,7 @@ export class WorkspacesService {
 
     // User doesn't exist: send invite link
     const appUrl =
-      this.config.get<string>('NEXT_PUBLIC_APP_URL') ?? 'https://app.tasky.io';
+      this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
     const inviteLink = `${appUrl}/signup?email=${encodeURIComponent(dto.email)}&workspace=${workspaceId}`;
 
     await this.mail.sendInviteEmail(
