@@ -15,6 +15,7 @@ import { QueryTaskDto } from './dto/query-task.dto';
 import { BulkTaskDto, BulkTaskAction } from './dto/bulk-task.dto';
 import { TaskStatusesService } from '../task-statuses/task-statuses.service';
 import { buildTaskVisibilityWhere } from './task-visibility';
+import { SseService } from '../sse/sse.service';
 
 const ASSIGNEE_USER_SELECT = {
   id: true,
@@ -43,6 +44,7 @@ export class TasksService {
     private readonly analytics: AnalyticsService,
     private readonly taskStatuses: TaskStatusesService,
     private readonly notificationsService: NotificationsService,
+    private readonly sse: SseService,
   ) {}
 
   async list(
@@ -200,6 +202,7 @@ export class TasksService {
       }
     }
 
+    this.sse.emit(workspaceId, { type: 'tasks_changed' });
     return created;
   }
 
@@ -302,6 +305,7 @@ export class TasksService {
       }
     }
 
+    this.sse.emit(workspaceId, { type: 'tasks_changed' });
     return this.fetchTaskWithDetails(workspaceId, taskId);
   }
 
@@ -335,6 +339,7 @@ export class TasksService {
       assigneeId: targetUserId,
     });
 
+    this.sse.emit(workspaceId, { type: 'tasks_changed' });
     return this.fetchTaskWithDetails(workspaceId, taskId);
   }
 
@@ -494,6 +499,7 @@ export class TasksService {
       ]);
     }
 
+    this.sse.emit(workspaceId, { type: 'tasks_changed' });
     return updated;
   }
 
@@ -625,6 +631,7 @@ export class TasksService {
           })
         : Promise.resolve(null),
     ]);
+    this.sse.emit(workspaceId, { type: 'tasks_changed' });
     return updated;
   }
 
@@ -636,6 +643,7 @@ export class TasksService {
       where: { recurrenceParentId: id, workspaceId, deletedAt: null },
       data: { deletedAt: now },
     });
+    this.sse.emit(workspaceId, { type: 'tasks_changed' });
   }
 
   /** Reorder tasks: accepts ordered array of ids, assigns sortOrder 0..n-1 */
@@ -684,6 +692,7 @@ export class TasksService {
       WHERE id IN (${idList})
         AND workspace_id = '${workspaceId}'
     `);
+    this.sse.emit(workspaceId, { type: 'tasks_changed' });
   }
 
   async bulkUpdate(
@@ -719,6 +728,7 @@ export class TasksService {
         where: { id: { in: validIds } },
         data: { deletedAt: new Date() },
       });
+      this.sse.emit(workspaceId, { type: 'tasks_changed' });
       return { affected: validIds.length };
     }
 
@@ -740,6 +750,7 @@ export class TasksService {
       await this.analytics.logStat(workspaceId, userId, {
         tasksCompleted: toCompleteIds.length,
       });
+      this.sse.emit(workspaceId, { type: 'tasks_changed' });
     }
 
     return { affected: toCompleteIds.length };

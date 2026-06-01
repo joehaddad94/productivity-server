@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { SseModule } from '../sse/sse.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { TaskStatusesModule } from '../task-statuses/task-statuses.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -13,6 +14,7 @@ import { CommentsService } from './comments.service';
     AnalyticsModule,
     TaskStatusesModule,
     NotificationsModule,
+    SseModule,
   ],
   controllers: [TasksController],
   providers: [TasksService, CommentsService],
