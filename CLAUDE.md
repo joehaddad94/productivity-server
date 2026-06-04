@@ -59,6 +59,7 @@ Use PowerShell or cmd.exe — NOT Git Bash / WSL.
 - Parallel DB queries on all list endpoints
 - OpenTelemetry → Grafana Cloud (traces + metrics)
 - `project { id, name }` embedded in task list response
+- SSE real-time sync (`src/sse/`) — `GET /sse/workspace/:id`; `SseService` emits after every TasksService mutation; client invalidates TanStack Query on each event
 
 ## Pending
 - CSP headers (helmet not installed)
