@@ -20,6 +20,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { CalendarConnectionsModule } from './calendar-connections/calendar-connections.module';
 import { BugReportsModule } from './bug-reports/bug-reports.module';
 import { TimerStateModule } from './timer-state/timer-state.module';
+import { SseModule } from './sse/sse.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { TimerStateModule } from './timer-state/timer-state.module';
     CalendarConnectionsModule,
     BugReportsModule,
     TimerStateModule,
+    SseModule,
   ],
   controllers: [AppController],
   providers: [

@@ -210,8 +210,7 @@ export class WorkspacesService {
 
       // Send notification email
       const appUrl =
-        this.config.get<string>('NEXT_PUBLIC_APP_URL') ??
-        'https://app.tasky.io';
+        this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
       await this.mail.sendInviteEmail(
         dto.email,
         workspace.name,
@@ -224,7 +223,7 @@ export class WorkspacesService {
 
     // User doesn't exist: send invite link
     const appUrl =
-      this.config.get<string>('NEXT_PUBLIC_APP_URL') ?? 'https://app.tasky.io';
+      this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
     const inviteLink = `${appUrl}/signup?email=${encodeURIComponent(dto.email)}&workspace=${workspaceId}`;
 
     await this.mail.sendInviteEmail(
@@ -261,9 +260,8 @@ export class WorkspacesService {
     });
     if (!targetMembership) throw new NotFoundException('Member not found');
 
-    // Cleanup: unassign all their TaskAssignee rows, soft-delete tasks
-    // they created, then drop the workspace_member row. All in one tx.
-    const now = new Date();
+    // Cleanup: unassign all their TaskAssignee rows, reassign tasks they
+    // created to the workspace owner, then drop the workspace_member row.
     await this.prisma.$transaction([
       this.prisma.taskAssignee.deleteMany({
         where: {
@@ -277,7 +275,7 @@ export class WorkspacesService {
           creatorId: targetUserId,
           deletedAt: null,
         },
-        data: { deletedAt: now },
+        data: { creatorId: requesterId },
       }),
       this.prisma.workspaceMember.delete({
         where: { userId_workspaceId: { userId: targetUserId, workspaceId } },

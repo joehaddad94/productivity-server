@@ -15,6 +15,7 @@ import { QueryTaskDto } from './dto/query-task.dto';
 import { BulkTaskDto, BulkTaskAction } from './dto/bulk-task.dto';
 import { TaskStatusesService } from '../task-statuses/task-statuses.service';
 import { buildTaskVisibilityWhere } from './task-visibility';
+import { SseService } from '../sse/sse.service';
 
 const ASSIGNEE_USER_SELECT = {
   id: true,
@@ -43,6 +44,7 @@ export class TasksService {
     private readonly analytics: AnalyticsService,
     private readonly taskStatuses: TaskStatusesService,
     private readonly notificationsService: NotificationsService,
+    private readonly sse: SseService,
   ) {}
 
   async list(
@@ -150,9 +152,6 @@ export class TasksService {
           'Only owner or admin can assign tasks',
         );
       }
-      if (dto.assigneeIds.includes(userId)) {
-        throw new BadRequestException('Cannot assign a task to yourself');
-      }
       await this.assertUsersInWorkspace(workspaceId, dto.assigneeIds);
       const seen = new Set(assigneeRows.map((r) => r.userId));
       for (const uid of dto.assigneeIds) {
@@ -184,7 +183,7 @@ export class TasksService {
     });
 
     // Fire-and-forget: log creation activity + assignment notifications
-    void this.logActivity(created.id, userId, 'created');
+    void this.logActivity(created.id, userId, 'created', undefined, workspaceId);
 
     if (assigneeRows.length > 0) {
       const recipientIds = assigneeRows
@@ -196,10 +195,11 @@ export class TasksService {
       for (const row of assigneeRows) {
         void this.logActivity(created.id, userId, 'assigned', {
           assigneeId: row.userId,
-        });
+        }, workspaceId);
       }
     }
 
+    this.sse.emit(workspaceId, { type: 'tasks_changed' });
     return created;
   }
 
@@ -268,9 +268,6 @@ export class TasksService {
     if (role !== 'owner' && role !== 'admin') {
       throw new ForbiddenException('Only owner or admin can assign tasks');
     }
-    if (userIds.includes(requesterId)) {
-      throw new BadRequestException('Cannot assign a task to yourself');
-    }
     await this.assertUsersInWorkspace(workspaceId, userIds);
 
     const task = await this.prisma.task.findFirst({
@@ -297,11 +294,20 @@ export class TasksService {
 
     if (newAssigneeIds.length > 0) {
       void this.notifyAssigned(workspaceId, taskId, task.title, newAssigneeIds);
+      const assigneeUsers = await this.prisma.user.findMany({
+        where: { id: { in: newAssigneeIds } },
+        select: { id: true, name: true, email: true },
+      });
+      const nameMap = new Map(assigneeUsers.map((u) => [u.id, u.name ?? u.email]));
       for (const uid of newAssigneeIds) {
-        void this.logActivity(taskId, requesterId, 'assigned', { assigneeId: uid });
+        void this.logActivity(taskId, requesterId, 'assigned', {
+          assigneeId: uid,
+          assigneeName: nameMap.get(uid) ?? null,
+        }, workspaceId);
       }
     }
 
+    this.sse.emit(workspaceId, { type: 'tasks_changed' });
     return this.fetchTaskWithDetails(workspaceId, taskId);
   }
 
@@ -331,10 +337,16 @@ export class TasksService {
       where: { taskId, userId: targetUserId },
     });
 
+    const removedUser = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { name: true, email: true },
+    });
     void this.logActivity(taskId, requesterId, 'unassigned', {
       assigneeId: targetUserId,
-    });
+      assigneeName: removedUser ? (removedUser.name ?? removedUser.email) : null,
+    }, workspaceId);
 
+    this.sse.emit(workspaceId, { type: 'tasks_changed' });
     return this.fetchTaskWithDetails(workspaceId, taskId);
   }
 
@@ -343,11 +355,14 @@ export class TasksService {
     userId: string,
     type: string,
     metadata?: Record<string, unknown>,
+    workspaceId?: string,
   ): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return this.prisma.taskActivity
       .create({ data: { taskId, userId, type, metadata: (metadata as any) ?? undefined } })
-      .then(() => undefined)
+      .then(() => {
+        if (workspaceId) this.sse.emit(workspaceId, { type: 'thread_changed', taskId });
+      })
       .catch(() => undefined); // never block the primary operation
   }
 
@@ -460,19 +475,44 @@ export class TasksService {
       void this.logActivity(id, userId, 'status_changed', {
         from: existing.status,
         to: dto.status,
-      });
+      }, workspaceId);
     }
     if (dto.dueDate !== undefined) {
       void this.logActivity(id, userId, 'due_date_changed', {
         from: existing.dueDate?.toISOString().slice(0, 10) ?? null,
         to: dto.dueDate ?? null,
-      });
+      }, workspaceId);
     }
     if (dto.priority !== undefined && dto.priority !== existing.priority) {
       void this.logActivity(id, userId, 'priority_changed', {
         from: existing.priority ?? null,
         to: dto.priority,
-      });
+      }, workspaceId);
+    }
+    if (dto.title !== undefined && dto.title.trim() !== existing.title) {
+      void this.logActivity(id, userId, 'title_changed', {
+        from: existing.title,
+        to: dto.title.trim(),
+      }, workspaceId);
+    }
+    if (dto.projectId !== undefined && dto.projectId !== existing.projectId) {
+      void this.logActivity(id, userId, 'project_changed', {
+        from: existing.projectId ?? null,
+        to: dto.projectId ?? null,
+      }, workspaceId);
+    }
+    if (dto.recurrenceRule !== undefined && dto.recurrenceRule !== existing.recurrenceRule) {
+      void this.logActivity(id, userId, 'recurrence_changed', {
+        from: existing.recurrenceRule ?? null,
+        to: dto.recurrenceRule ?? null,
+      }, workspaceId);
+    }
+    if (dto.remindAt !== undefined) {
+      const from = existing.remindAt?.toISOString() ?? null;
+      const to = dto.remindAt ?? null;
+      if (from !== to) {
+        void this.logActivity(id, userId, 'remind_at_changed', { from, to }, workspaceId);
+      }
     }
 
     if (isCompleting) {
@@ -494,6 +534,7 @@ export class TasksService {
       ]);
     }
 
+    this.sse.emit(workspaceId, { type: 'tasks_changed' });
     return updated;
   }
 
@@ -625,6 +666,7 @@ export class TasksService {
           })
         : Promise.resolve(null),
     ]);
+    this.sse.emit(workspaceId, { type: 'tasks_changed' });
     return updated;
   }
 
@@ -636,6 +678,7 @@ export class TasksService {
       where: { recurrenceParentId: id, workspaceId, deletedAt: null },
       data: { deletedAt: now },
     });
+    this.sse.emit(workspaceId, { type: 'tasks_changed' });
   }
 
   /** Reorder tasks: accepts ordered array of ids, assigns sortOrder 0..n-1 */
@@ -684,6 +727,7 @@ export class TasksService {
       WHERE id IN (${idList})
         AND workspace_id = '${workspaceId}'
     `);
+    this.sse.emit(workspaceId, { type: 'tasks_changed' });
   }
 
   async bulkUpdate(
@@ -719,6 +763,7 @@ export class TasksService {
         where: { id: { in: validIds } },
         data: { deletedAt: new Date() },
       });
+      this.sse.emit(workspaceId, { type: 'tasks_changed' });
       return { affected: validIds.length };
     }
 
@@ -740,6 +785,7 @@ export class TasksService {
       await this.analytics.logStat(workspaceId, userId, {
         tasksCompleted: toCompleteIds.length,
       });
+      this.sse.emit(workspaceId, { type: 'tasks_changed' });
     }
 
     return { affected: toCompleteIds.length };
