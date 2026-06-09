@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SseService } from '../sse/sse.service';
 import { assertMember } from '../common/assert-member';
 
 export type ThreadItem =
@@ -30,7 +31,10 @@ export type ThreadItem =
 
 @Injectable()
 export class CommentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sse: SseService,
+  ) {}
 
   async getThread(
     workspaceId: string,
@@ -118,6 +122,8 @@ export class CommentsService {
       include: { user: { select: { id: true, name: true, avatarUrl: true } } },
     });
 
+    this.sse.emit(workspaceId, { type: 'thread_changed', taskId });
+
     return {
       kind: 'comment',
       id: comment.id,
@@ -147,5 +153,6 @@ export class CommentsService {
     }
 
     await this.prisma.taskComment.delete({ where: { id: commentId } });
+    this.sse.emit(workspaceId, { type: 'thread_changed', taskId });
   }
 }
