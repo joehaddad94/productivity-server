@@ -152,9 +152,6 @@ export class TasksService {
           'Only owner or admin can assign tasks',
         );
       }
-      if (dto.assigneeIds.includes(userId)) {
-        throw new BadRequestException('Cannot assign a task to yourself');
-      }
       await this.assertUsersInWorkspace(workspaceId, dto.assigneeIds);
       const seen = new Set(assigneeRows.map((r) => r.userId));
       for (const uid of dto.assigneeIds) {
@@ -270,9 +267,6 @@ export class TasksService {
     );
     if (role !== 'owner' && role !== 'admin') {
       throw new ForbiddenException('Only owner or admin can assign tasks');
-    }
-    if (userIds.includes(requesterId)) {
-      throw new BadRequestException('Cannot assign a task to yourself');
     }
     await this.assertUsersInWorkspace(workspaceId, userIds);
 
