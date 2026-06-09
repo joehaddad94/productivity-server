@@ -260,9 +260,8 @@ export class WorkspacesService {
     });
     if (!targetMembership) throw new NotFoundException('Member not found');
 
-    // Cleanup: unassign all their TaskAssignee rows, soft-delete tasks
-    // they created, then drop the workspace_member row. All in one tx.
-    const now = new Date();
+    // Cleanup: unassign all their TaskAssignee rows, reassign tasks they
+    // created to the workspace owner, then drop the workspace_member row.
     await this.prisma.$transaction([
       this.prisma.taskAssignee.deleteMany({
         where: {
@@ -276,7 +275,7 @@ export class WorkspacesService {
           creatorId: targetUserId,
           deletedAt: null,
         },
-        data: { deletedAt: now },
+        data: { creatorId: requesterId },
       }),
       this.prisma.workspaceMember.delete({
         where: { userId_workspaceId: { userId: targetUserId, workspaceId } },
