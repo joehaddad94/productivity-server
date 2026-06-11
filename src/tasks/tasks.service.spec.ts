@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { TaskStatusesService } from '../task-statuses/task-statuses.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SseService } from '../sse/sse.service';
 import { membershipCache, membershipKey } from '../common/membership-cache';
 import { RecurrenceRule } from './dto/create-task.dto';
 import { BulkTaskAction } from './dto/bulk-task.dto';
@@ -45,7 +46,9 @@ describe('TasksService', () => {
   const OPEN_STATUS = 'status-open';
   const DONE_STATUS = 'status-done';
 
-  const makeTask = (overrides: Partial<Task> = {}): Task & { subtasks: Task[]; assignees: any[] } => ({
+  const makeTask = (
+    overrides: Partial<Task> = {},
+  ): Task & { subtasks: Task[]; assignees: any[] } => ({
     id: 'task-1',
     workspaceId: WS,
     title: 'My Task',
@@ -115,6 +118,7 @@ describe('TasksService', () => {
       getFirstTerminalStatusId: jest.fn().mockResolvedValue(DONE_STATUS),
     };
     const mockNotifications = { createAndDeliver: jest.fn() };
+    const mockSse = { emit: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -123,6 +127,7 @@ describe('TasksService', () => {
         { provide: AnalyticsService, useValue: mockAnalytics },
         { provide: TaskStatusesService, useValue: mockTaskStatuses },
         { provide: NotificationsService, useValue: mockNotifications },
+        { provide: SseService, useValue: mockSse },
       ],
     }).compile();
 
@@ -234,9 +239,9 @@ describe('TasksService', () => {
     it('throws ForbiddenException when user is not a workspace member', async () => {
       prisma.workspaceMember.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.create(WS, USER, { title: 'Task' }),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.create(WS, USER, { title: 'Task' })).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('creates task with default open status and trimmed title', async () => {
@@ -386,7 +391,10 @@ describe('TasksService', () => {
       taskStatuses.isTerminal
         .mockResolvedValueOnce(false) // wasTerminal (existing)
         .mockResolvedValueOnce(true); // nowTerminal (new status)
-      const updated = makeTask({ status: DONE_STATUS, completedAt: new Date() });
+      const updated = makeTask({
+        status: DONE_STATUS,
+        completedAt: new Date(),
+      });
       prisma.task.update.mockResolvedValue(updated);
       prisma.task.updateMany.mockResolvedValue({ count: 0 });
       analytics.logStat.mockResolvedValue(undefined as never);
@@ -406,7 +414,10 @@ describe('TasksService', () => {
     });
 
     it('clears completedAt when status changes from terminal to open', async () => {
-      const existing = makeTask({ status: DONE_STATUS, completedAt: new Date() });
+      const existing = makeTask({
+        status: DONE_STATUS,
+        completedAt: new Date(),
+      });
       prisma.task.findFirst.mockResolvedValue(existing);
       taskStatuses.isTerminal
         .mockResolvedValueOnce(true) // wasTerminal
@@ -477,7 +488,11 @@ describe('TasksService', () => {
         .mockResolvedValueOnce(false)
         .mockResolvedValueOnce(true);
       prisma.task.update.mockResolvedValue(
-        makeTask({ status: DONE_STATUS, title: 'My Task', completedAt: new Date() }),
+        makeTask({
+          status: DONE_STATUS,
+          title: 'My Task',
+          completedAt: new Date(),
+        }),
       );
       prisma.task.updateMany.mockResolvedValue({ count: 0 });
       analytics.logStat.mockResolvedValue(undefined as never);
@@ -633,7 +648,11 @@ describe('TasksService', () => {
       expect((prisma as any).dailyStat.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           update: { focusMinutes: { increment: 25 } },
-          create: expect.objectContaining({ workspaceId: WS, userId: USER, focusMinutes: 25 }),
+          create: expect.objectContaining({
+            workspaceId: WS,
+            userId: USER,
+            focusMinutes: 25,
+          }),
         }),
       );
     });

@@ -59,7 +59,13 @@ describe('WorkspacesService', () => {
       providers: [
         WorkspacesService,
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: MailService, useValue: { sendInviteEmail: jest.fn() } },
+        {
+          provide: MailService,
+          useValue: {
+            sendInviteEmail: jest.fn(),
+            sendAddedToWorkspaceEmail: jest.fn(),
+          },
+        },
         { provide: ConfigService, useValue: { get: jest.fn() } },
         { provide: TaskStatusesService, useValue: mockTaskStatuses },
       ],
@@ -96,7 +102,9 @@ describe('WorkspacesService', () => {
       expect(prisma.workspaceMember.create).toHaveBeenCalledWith({
         data: { userId: 'user-1', workspaceId: 'ws-1', role: 'owner' },
       });
-      expect(taskStatuses.seedDefaultsForWorkspace).toHaveBeenCalledWith('ws-1');
+      expect(taskStatuses.seedDefaultsForWorkspace).toHaveBeenCalledWith(
+        'ws-1',
+      );
     });
 
     it('derives slug from name when slug is omitted', async () => {

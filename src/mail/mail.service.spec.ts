@@ -115,6 +115,21 @@ describe('MailService', () => {
       expect(call.htmlContent).toContain(`href="${link}"`);
     });
 
+    it('includes a plain-text part', async () => {
+      configGet.mockImplementation((key: string) =>
+        key === 'BREVO_API_KEY' ? 'brevo-key' : undefined,
+      );
+      mockSendTransacEmail.mockResolvedValue(undefined);
+
+      const link = 'https://app.example.com/auth/verify?token=abc';
+      await service.sendMagicLinkEmail('test@example.com', link);
+
+      const call = mockSendTransacEmail.mock.calls[0][0] as {
+        textContent: string;
+      };
+      expect(call.textContent).toContain(link);
+    });
+
     it('sends to multiple recipients on successive calls', async () => {
       configGet.mockImplementation((key: string) =>
         key === 'BREVO_API_KEY' ? 'brevo-key' : undefined,
@@ -133,6 +148,70 @@ describe('MailService', () => {
         2,
         expect.objectContaining({ to: [{ email: 'b@example.com' }] }),
       );
+    });
+  });
+
+  describe('HTML escaping', () => {
+    beforeEach(() => {
+      configGet.mockImplementation((key: string) =>
+        key === 'BREVO_API_KEY' ? 'brevo-key' : undefined,
+      );
+      mockSendTransacEmail.mockResolvedValue(undefined);
+    });
+
+    it('escapes user-controlled workspace name in invite emails', async () => {
+      await service.sendInviteEmail(
+        'user@example.com',
+        '<img src=x onerror=alert(1)>',
+        'https://app.example.com/signup',
+        '<b>Joe</b>',
+      );
+
+      const call = mockSendTransacEmail.mock.calls[0][0] as {
+        htmlContent: string;
+      };
+      expect(call.htmlContent).not.toContain('<img src=x');
+      expect(call.htmlContent).not.toContain('<b>Joe</b>');
+      expect(call.htmlContent).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    });
+
+    it('escapes title and body in notification emails', async () => {
+      await service.sendNotificationEmail(
+        'user@example.com',
+        'Reminder',
+        '"<script>alert(1)</script>" is due today',
+      );
+
+      const call = mockSendTransacEmail.mock.calls[0][0] as {
+        htmlContent: string;
+      };
+      expect(call.htmlContent).not.toContain('<script>');
+      expect(call.htmlContent).toContain('&lt;script&gt;');
+    });
+  });
+
+  describe('sendAddedToWorkspaceEmail', () => {
+    it('sends with workspace link and falls back to a neutral greeting', async () => {
+      configGet.mockImplementation((key: string) =>
+        key === 'BREVO_API_KEY' ? 'brevo-key' : undefined,
+      );
+      mockSendTransacEmail.mockResolvedValue(undefined);
+
+      const result = await service.sendAddedToWorkspaceEmail(
+        'user@example.com',
+        'Marketing',
+        'https://app.example.com/dashboard',
+        null,
+      );
+
+      expect(result).toBe(true);
+      const call = mockSendTransacEmail.mock.calls[0][0] as {
+        subject: string;
+        htmlContent: string;
+      };
+      expect(call.subject).toBe("You've been added to Marketing on Tasky");
+      expect(call.htmlContent).toContain('Hi there,');
+      expect(call.htmlContent).toContain('https://app.example.com/dashboard');
     });
   });
 });
