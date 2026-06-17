@@ -33,14 +33,14 @@ describe('CalendarConnectionsService', () => {
       },
     };
 
-    configGet = jest.fn().mockImplementation((key: string) => configValues[key]);
-    const configGetOrThrow = jest
+    configGet = jest
       .fn()
-      .mockImplementation((key: string) => {
-        const val = configValues[key];
-        if (!val) throw new Error(`Missing config: ${key}`);
-        return val;
-      });
+      .mockImplementation((key: string) => configValues[key]);
+    const configGetOrThrow = jest.fn().mockImplementation((key: string) => {
+      const val = configValues[key];
+      if (!val) throw new Error(`Missing config: ${key}`);
+      return val;
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -74,9 +74,11 @@ describe('CalendarConnectionsService', () => {
 
   describe('verifyOAuthState', () => {
     it('returns userId for a valid state', () => {
-      const state = (service as unknown as {
-        signOAuthState: (id: string) => string;
-      }).signOAuthState(USER);
+      const state = (
+        service as unknown as {
+          signOAuthState: (id: string) => string;
+        }
+      ).signOAuthState(USER);
 
       const result = service.verifyOAuthState(state);
 
@@ -90,11 +92,15 @@ describe('CalendarConnectionsService', () => {
     });
 
     it('throws BadRequestException for tampered signature', () => {
-      const validState = (service as unknown as {
-        signOAuthState: (id: string) => string;
-      }).signOAuthState(USER);
-      // Replace last character to tamper with signature
-      const tampered = validState.slice(0, -1) + 'x';
+      const validState = (
+        service as unknown as {
+          signOAuthState: (id: string) => string;
+        }
+      ).signOAuthState(USER);
+      // Replace last character to tamper with signature; pick a character
+      // guaranteed to differ so the test can't pass by coincidence
+      const lastChar = validState.slice(-1);
+      const tampered = validState.slice(0, -1) + (lastChar === 'x' ? 'y' : 'x');
 
       expect(() => service.verifyOAuthState(tampered)).toThrow(
         BadRequestException,
@@ -328,11 +334,7 @@ describe('CalendarConnectionsService', () => {
     it('returns empty array when no connections', async () => {
       prisma.calendarConnection.findMany.mockResolvedValue([]);
 
-      const result = await service.getEvents(
-        USER,
-        '2026-05-01',
-        '2026-05-31',
-      );
+      const result = await service.getEvents(USER, '2026-05-01', '2026-05-31');
 
       expect(result).toEqual([]);
     });
@@ -365,11 +367,7 @@ describe('CalendarConnectionsService', () => {
           }),
       });
 
-      const result = await service.getEvents(
-        USER,
-        '2026-05-01',
-        '2026-05-31',
-      );
+      const result = await service.getEvents(USER, '2026-05-01', '2026-05-31');
 
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({
@@ -410,11 +408,7 @@ describe('CalendarConnectionsService', () => {
           }),
       });
 
-      const result = await service.getEvents(
-        USER,
-        '2026-05-01',
-        '2026-05-31',
-      );
+      const result = await service.getEvents(USER, '2026-05-01', '2026-05-31');
 
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({
@@ -453,11 +447,7 @@ describe('CalendarConnectionsService', () => {
         })
         .mockResolvedValueOnce({ ok: false });
 
-      const result = await service.getEvents(
-        USER,
-        '2026-05-01',
-        '2026-05-31',
-      );
+      const result = await service.getEvents(USER, '2026-05-01', '2026-05-31');
 
       expect(result).toEqual([]);
     });
@@ -489,11 +479,7 @@ describe('CalendarConnectionsService', () => {
           }),
       });
 
-      const result = await service.getEvents(
-        USER,
-        '2026-05-01',
-        '2026-05-31',
-      );
+      const result = await service.getEvents(USER, '2026-05-01', '2026-05-31');
 
       expect(result[0].allDay).toBe(true);
     });

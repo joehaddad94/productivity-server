@@ -208,14 +208,14 @@ export class WorkspacesService {
         data: { userId: existingUser.id, workspaceId, role: 'member' },
       });
 
-      // Send notification email
+      // Already a member at this point — no accept step, so don't send an "invite"
       const appUrl =
         this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
-      await this.mail.sendInviteEmail(
+      await this.mail.sendAddedToWorkspaceEmail(
         dto.email,
         workspace.name,
         `${appUrl}/dashboard`,
-        existingUser.name ?? dto.email,
+        existingUser.name,
       );
 
       return { invited: true, message: 'User added to workspace' };
@@ -230,7 +230,7 @@ export class WorkspacesService {
       dto.email,
       workspace.name,
       inviteLink,
-      dto.email,
+      null,
     );
 
     return { invited: true, message: 'Invite email sent' };

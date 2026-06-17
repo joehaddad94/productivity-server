@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Tasky email previews</title>
+<style>
+  body { margin: 0; font-family: Inter, 'Segoe UI', Arial, sans-serif; background: #fafafa; color: #0a0a0a; }
+  nav { position: sticky; top: 0; background: #fff; border-bottom: 1px solid #e4e4e7; padding: 10px 16px; display: flex; gap: 8px; flex-wrap: wrap; z-index: 1; }
+  nav button { border: 1px solid #e4e4e7; background: #fff; border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+  nav button.active { background: #047857; color: #fff; border-color: #047857; }
+  section { display: none; padding: 24px 16px; max-width: 1200px; margin: 0 auto; }
+  section.active { display: block; }
+  h2 { font-size: 16px; margin: 0 0 4px; }
+  .subject { color: #374151; font-size: 14px; margin: 0 0 4px; }
+  .note { color: #b45309; font-size: 13px; margin: 0 0 12px; }
+  .frames { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; margin-top: 12px; }
+  .frame { border: 1px solid #e4e4e7; border-radius: 8px; background: #fff; overflow: hidden; }
+  .frame header { font-size: 12px; color: #71717a; padding: 6px 10px; border-bottom: 1px solid #e4e4e7; }
+  iframe { border: 0; display: block; height: 640px; }
+  .desktop iframe { width: 700px; }
+  .mobile iframe { width: 375px; }
+  pre { background: #18181b; color: #e4e4e7; font-size: 12px; padding: 14px; border-radius: 8px; overflow: auto; max-width: 700px; }
+</style>
+</head>
+<body>
+<nav>
+  <button data-target="p0" class="active">Magic link</button>
+  <button data-target="p1">Notification — reminder</button>
+  <button data-target="p2">Notification — daily agenda</button>
+  <button data-target="p3">Invite (new user)</button>
+  <button data-target="p4">Invite (named recipient)</button>
+  <button data-target="p5">Added to workspace (existing user)</button>
+  <button data-target="p6">Escaping check (hostile input)</button>
+</nav>
+<section id="p0" class="active">
+  <h2>Magic link</h2>
+  <p class="subject">Subject: Your magic link to sign in</p>
+
+  <div class="frames">
+    <div class="frame desktop"><header>Desktop · 700px</header><iframe srcdoc="<!DOCTYPE html>
+<html lang=&quot;en&quot;>
+  <head>
+    <meta charset=&quot;utf-8&quot; />
+    <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; />
+  </head>
+  <body style=&quot;margin:0;padding:0;background:#f4f4f5;&quot;>
+    <span style=&quot;display:none;font-size:1px;color:#f4f4f5;max-height:0;max-width:0;opacity:0;overflow:hidden;&quot;>Your secure sign-in link expires in 15 minutes.</span>
+    <div style=&quot;margin:0;background:#f4f4f5;padding:28px 14px;font-family:Inter,'Segoe UI',Arial,sans-serif;color:#0a0a0a;&quot;>
+      <div style=&quot;max-width:560px;margin:0 auto;&quot;>
+        <table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; align=&quot;center&quot; style=&quot;margin:0 auto 12px;&quot;>
+          <tr>
+            <td style=&quot;padding:6px 10px;border-radius:999px;background:#e6f2ee;color:#047857;font-size:12px;font-weight:600;letter-spacing:.02em;&quot;>
+              Tasky
+            </td>
+          </tr>
+        </table>
+
+        <div style=&quot;background:#ffffff;border:1px solid #e4e4e7;border-radius:16px;box-shadow:0 8px 24px rgba(10,10,10,.06);padding:28px;&quot;>
+
+          <h2 style=&quot;margin:0 0 10px;font-size:22px;line-height:1.25;color:#0a0a0a;&quot;>Sign in to Tasky</h2>
+          <p style=&quot;margin:0 0 18px;font-size:14px;line-height:1.65;color:#71717a;&quot;>
+            Use the secure link below to access your account. This sign-in link expires in <strong>15 minutes</strong>.
+          </p>
+
+    <p style=&quot;margin:0 0 20px;&quot;>
+      <a
+        href=&quot;https://app.tasky.example/auth/verify?token=sample-token-abc123&quot;
+        style=&quot;display:inline-block;background:#047857;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:10px;font-size:14px;font-weight:600;&quot;
+      >
+        Sign in to Tasky
+      </a>
+    </p>
+  
+          <p style=&quot;margin:0 0 8px;font-size:14px;line-height:1.5;&quot;>
+            Or copy and paste this link in your browser:
+          </p>
+          <p style=&quot;margin:0 0 18px;font-size:12px;line-height:1.6;color:#71717a;word-break:break-all;&quot;>
+            <a href=&quot;https://app.tasky.example/auth/verify?token=sample-token-abc123&quot; style=&quot;color:#047857;text-decoration:underline;&quot;>https://app.tasky.example/auth/verify?token=sample-token-abc123</a>
+          </p>
+          <p style=&quot;margin:0;font-size:12px;line-height:1.6;color:#71717a;&quot;>
+            You received this because someone requested a sign-in link for your email. If this was not you, you can safely ignore this message.
+          </p>
+        </div>
+
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>
+          Tasky • Track tasks • Focus better • Stay consistent
+        </p>
+      </div>
+    </div>
+  </body>
+</html>"></iframe></div>
+    <div class="frame mobile"><header>Mobile · 375px</header><iframe srcdoc="<!DOCTYPE html>
+<html lang=&quot;en&quot;>
+  <head>
+    <meta charset=&quot;utf-8&quot; />
+    <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; />
+  </head>
+  <body style=&quot;margin:0;padding:0;background:#f4f4f5;&quot;>
+    <span style=&quot;display:none;font-size:1px;color:#f4f4f5;max-height:0;max-width:0;opacity:0;overflow:hidden;&quot;>Your secure sign-in link expires in 15 minutes.</span>
+    <div style=&quot;margin:0;background:#f4f4f5;padding:28px 14px;font-family:Inter,'Segoe UI',Arial,sans-serif;color:#0a0a0a;&quot;>
+      <div style=&quot;max-width:560px;margin:0 auto;&quot;>
+        <table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; align=&quot;center&quot; style=&quot;margin:0 auto 12px;&quot;>
+          <tr>
+            <td style=&quot;padding:6px 10px;border-radius:999px;background:#e6f2ee;color:#047857;font-size:12px;font-weight:600;letter-spacing:.02em;&quot;>
+              Tasky
+            </td>
+          </tr>
+        </table>
+
+        <div style=&quot;background:#ffffff;border:1px solid #e4e4e7;border-radius:16px;box-shadow:0 8px 24px rgba(10,10,10,.06);padding:28px;&quot;>
+
+          <h2 style=&quot;margin:0 0 10px;font-size:22px;line-height:1.25;color:#0a0a0a;&quot;>Sign in to Tasky</h2>
+          <p style=&quot;margin:0 0 18px;font-size:14px;line-height:1.65;color:#71717a;&quot;>
+            Use the secure link below to access your account. This sign-in link expires in <strong>15 minutes</strong>.
+          </p>
+
+    <p style=&quot;margin:0 0 20px;&quot;>
+      <a
+        href=&quot;https://app.tasky.example/auth/verify?token=sample-token-abc123&quot;
+        style=&quot;display:inline-block;background:#047857;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:10px;font-size:14px;font-weight:600;&quot;
+      >
+        Sign in to Tasky
+      </a>
+    </p>
+  
+          <p style=&quot;margin:0 0 8px;font-size:14px;line-height:1.5;&quot;>
+            Or copy and paste this link in your browser:
+          </p>
+          <p style=&quot;margin:0 0 18px;font-size:12px;line-height:1.6;color:#71717a;word-break:break-all;&quot;>
+            <a href=&quot;https://app.tasky.example/auth/verify?token=sample-token-abc123&quot; style=&quot;color:#047857;text-decoration:underline;&quot;>https://app.tasky.example/auth/verify?token=sample-token-abc123</a>
+          </p>
+          <p style=&quot;margin:0;font-size:12px;line-height:1.6;color:#71717a;&quot;>
+            You received this because someone requested a sign-in link for your email. If this was not you, you can safely ignore this message.
+          </p>
+        </div>
+
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>
+          Tasky • Track tasks • Focus better • Stay consistent
+        </p>
+      </div>
+    </div>
+  </body>
+</html>"></iframe></div>
+    <div><header style="font-size:12px;color:#71717a;padding:6px 0;">Plain-text part</header><pre>Sign in to Tasky
+
+Use the link below to access your account. It expires in 15 minutes.
+
+https://app.tasky.example/auth/verify?token=sample-token-abc123
+
+If you did not request this, you can safely ignore this message.</pre></div>
+  </div>
+</section>
+<section id="p1">
+  <h2>Notification — reminder</h2>
+  <p class="subject">Subject: Reminder</p>
+
+  <div class="frames">
+    <div class="frame desktop"><header>Desktop · 700px</header><iframe srcdoc="<!DOCTYPE html>
+<html lang=&quot;en&quot;>
+  <head>
+    <meta charset=&quot;utf-8&quot; />
+    <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; />
+  </head>
+  <body style=&quot;margin:0;padding:0;background:#f4f4f5;&quot;>
+    <span style=&quot;display:none;font-size:1px;color:#f4f4f5;max-height:0;max-width:0;opacity:0;overflow:hidden;&quot;>&amp;quot;Prepare Q3 report&amp;quot; is due today</span>
+    <div style=&quot;margin:0;background:#f4f4f5;padding:28px 14px;font-family:Inter,'Segoe UI',Arial,sans-serif;color:#0a0a0a;&quot;>
+      <div style=&quot;max-width:560px;margin:0 auto;&quot;>
+        <table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; align=&quot;center&quot; style=&quot;margin:0 auto 12px;&quot;>
+          <tr>
+            <td style=&quot;padding:6px 10px;border-radius:999px;background:#e6f2ee;color:#047857;font-size:12px;font-weight:600;letter-spacing:.02em;&quot;>
+              Tasky
+            </td>
+          </tr>
+        </table>
+
+        <div style=&quot;background:#ffffff;border:1px solid #e4e4e7;border-radius:16px;box-shadow:0 8px 24px rgba(10,10,10,.06);padding:28px;&quot;>
+
+          <h2 style=&quot;margin:0 0 10px;font-size:22px;line-height:1.25;color:#0a0a0a;&quot;>Reminder</h2>
+          <p style=&quot;margin:0;font-size:15px;line-height:1.65;color:#374151;&quot;>&amp;quot;Prepare Q3 report&amp;quot; is due today</p>
+        </div>
+
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>You're receiving this because you have email notifications enabled in Tasky. <a href=&quot;https://app.tasky.example/settings?tab=notifications&quot; style=&quot;color:#047857;&quot;>Manage preferences</a></p>
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>
+          Tasky • Track tasks • Focus better • Stay consistent
+        </p>
+      </div>
+    </div>
+  </body>
+</html>"></iframe></div>
+    <div class="frame mobile"><header>Mobile · 375px</header><iframe srcdoc="<!DOCTYPE html>
+<html lang=&quot;en&quot;>
+  <head>
+    <meta charset=&quot;utf-8&quot; />
+    <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; />
+  </head>
+  <body style=&quot;margin:0;padding:0;background:#f4f4f5;&quot;>
+    <span style=&quot;display:none;font-size:1px;color:#f4f4f5;max-height:0;max-width:0;opacity:0;overflow:hidden;&quot;>&amp;quot;Prepare Q3 report&amp;quot; is due today</span>
+    <div style=&quot;margin:0;background:#f4f4f5;padding:28px 14px;font-family:Inter,'Segoe UI',Arial,sans-serif;color:#0a0a0a;&quot;>
+      <div style=&quot;max-width:560px;margin:0 auto;&quot;>
+        <table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; align=&quot;center&quot; style=&quot;margin:0 auto 12px;&quot;>
+          <tr>
+            <td style=&quot;padding:6px 10px;border-radius:999px;background:#e6f2ee;color:#047857;font-size:12px;font-weight:600;letter-spacing:.02em;&quot;>
+              Tasky
+            </td>
+          </tr>
+        </table>
+
+        <div style=&quot;background:#ffffff;border:1px solid #e4e4e7;border-radius:16px;box-shadow:0 8px 24px rgba(10,10,10,.06);padding:28px;&quot;>
+
+          <h2 style=&quot;margin:0 0 10px;font-size:22px;line-height:1.25;color:#0a0a0a;&quot;>Reminder</h2>
+          <p style=&quot;margin:0;font-size:15px;line-height:1.65;color:#374151;&quot;>&amp;quot;Prepare Q3 report&amp;quot; is due today</p>
+        </div>
+
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>You're receiving this because you have email notifications enabled in Tasky. <a href=&quot;https://app.tasky.example/settings?tab=notifications&quot; style=&quot;color:#047857;&quot;>Manage preferences</a></p>
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>
+          Tasky • Track tasks • Focus better • Stay consistent
+        </p>
+      </div>
+    </div>
+  </body>
+</html>"></iframe></div>
+    <div><header style="font-size:12px;color:#71717a;padding:6px 0;">Plain-text part</header><pre>Reminder
+
+"Prepare Q3 report" is due today
+
+Manage preferences: https://app.tasky.example/settings?tab=notifications</pre></div>
+  </div>
+</section>
+<section id="p2">
+  <h2>Notification — daily agenda</h2>
+  <p class="subject">Subject: Daily Agenda</p>
+
+  <div class="frames">
+    <div class="frame desktop"><header>Desktop · 700px</header><iframe srcdoc="<!DOCTYPE html>
+<html lang=&quot;en&quot;>
+  <head>
+    <meta charset=&quot;utf-8&quot; />
+    <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; />
+  </head>
+  <body style=&quot;margin:0;padding:0;background:#f4f4f5;&quot;>
+    <span style=&quot;display:none;font-size:1px;color:#f4f4f5;max-height:0;max-width:0;opacity:0;overflow:hidden;&quot;>3 tasks due today · 1 overdue · 2 in progress</span>
+    <div style=&quot;margin:0;background:#f4f4f5;padding:28px 14px;font-family:Inter,'Segoe UI',Arial,sans-serif;color:#0a0a0a;&quot;>
+      <div style=&quot;max-width:560px;margin:0 auto;&quot;>
+        <table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; align=&quot;center&quot; style=&quot;margin:0 auto 12px;&quot;>
+          <tr>
+            <td style=&quot;padding:6px 10px;border-radius:999px;background:#e6f2ee;color:#047857;font-size:12px;font-weight:600;letter-spacing:.02em;&quot;>
+              Tasky
+            </td>
+          </tr>
+        </table>
+
+        <div style=&quot;background:#ffffff;border:1px solid #e4e4e7;border-radius:16px;box-shadow:0 8px 24px rgba(10,10,10,.06);padding:28px;&quot;>
+
+          <h2 style=&quot;margin:0 0 10px;font-size:22px;line-height:1.25;color:#0a0a0a;&quot;>Daily Agenda</h2>
+          <p style=&quot;margin:0;font-size:15px;line-height:1.65;color:#374151;&quot;>3 tasks due today · 1 overdue · 2 in progress</p>
+        </div>
+
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>You're receiving this because you have email notifications enabled in Tasky. <a href=&quot;https://app.tasky.example/settings?tab=notifications&quot; style=&quot;color:#047857;&quot;>Manage preferences</a></p>
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>
+          Tasky • Track tasks • Focus better • Stay consistent
+        </p>
+      </div>
+    </div>
+  </body>
+</html>"></iframe></div>
+    <div class="frame mobile"><header>Mobile · 375px</header><iframe srcdoc="<!DOCTYPE html>
+<html lang=&quot;en&quot;>
+  <head>
+    <meta charset=&quot;utf-8&quot; />
+    <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; />
+  </head>
+  <body style=&quot;margin:0;padding:0;background:#f4f4f5;&quot;>
+    <span style=&quot;display:none;font-size:1px;color:#f4f4f5;max-height:0;max-width:0;opacity:0;overflow:hidden;&quot;>3 tasks due today · 1 overdue · 2 in progress</span>
+    <div style=&quot;margin:0;background:#f4f4f5;padding:28px 14px;font-family:Inter,'Segoe UI',Arial,sans-serif;color:#0a0a0a;&quot;>
+      <div style=&quot;max-width:560px;margin:0 auto;&quot;>
+        <table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; align=&quot;center&quot; style=&quot;margin:0 auto 12px;&quot;>
+          <tr>
+            <td style=&quot;padding:6px 10px;border-radius:999px;background:#e6f2ee;color:#047857;font-size:12px;font-weight:600;letter-spacing:.02em;&quot;>
+              Tasky
+            </td>
+          </tr>
+        </table>
+
+        <div style=&quot;background:#ffffff;border:1px solid #e4e4e7;border-radius:16px;box-shadow:0 8px 24px rgba(10,10,10,.06);padding:28px;&quot;>
+
+          <h2 style=&quot;margin:0 0 10px;font-size:22px;line-height:1.25;color:#0a0a0a;&quot;>Daily Agenda</h2>
+          <p style=&quot;margin:0;font-size:15px;line-height:1.65;color:#374151;&quot;>3 tasks due today · 1 overdue · 2 in progress</p>
+        </div>
+
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>You're receiving this because you have email notifications enabled in Tasky. <a href=&quot;https://app.tasky.example/settings?tab=notifications&quot; style=&quot;color:#047857;&quot;>Manage preferences</a></p>
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>
+          Tasky • Track tasks • Focus better • Stay consistent
+        </p>
+      </div>
+    </div>
+  </body>
+</html>"></iframe></div>
+    <div><header style="font-size:12px;color:#71717a;padding:6px 0;">Plain-text part</header><pre>Daily Agenda
+
+3 tasks due today · 1 overdue · 2 in progress
+
+Manage preferences: https://app.tasky.example/settings?tab=notifications</pre></div>
+  </div>
+</section>
+<section id="p3">
+  <h2>Invite (new user)</h2>
+  <p class="subject">Subject: You've been invited to Marketing Team on Tasky</p>
+
+  <div class="frames">
+    <div class="frame desktop"><header>Desktop · 700px</header><iframe srcdoc="<!DOCTYPE html>
+<html lang=&quot;en&quot;>
+  <head>
+    <meta charset=&quot;utf-8&quot; />
+    <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; />
+  </head>
+  <body style=&quot;margin:0;padding:0;background:#f4f4f5;&quot;>
+    <span style=&quot;display:none;font-size:1px;color:#f4f4f5;max-height:0;max-width:0;opacity:0;overflow:hidden;&quot;>Join the Marketing Team workspace on Tasky.</span>
+    <div style=&quot;margin:0;background:#f4f4f5;padding:28px 14px;font-family:Inter,'Segoe UI',Arial,sans-serif;color:#0a0a0a;&quot;>
+      <div style=&quot;max-width:560px;margin:0 auto;&quot;>
+        <table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; align=&quot;center&quot; style=&quot;margin:0 auto 12px;&quot;>
+          <tr>
+            <td style=&quot;padding:6px 10px;border-radius:999px;background:#e6f2ee;color:#047857;font-size:12px;font-weight:600;letter-spacing:.02em;&quot;>
+              Tasky
+            </td>
+          </tr>
+        </table>
+
+        <div style=&quot;background:#ffffff;border:1px solid #e4e4e7;border-radius:16px;box-shadow:0 8px 24px rgba(10,10,10,.06);padding:28px;&quot;>
+
+          <h2 style=&quot;margin:0 0 10px;font-size:22px;line-height:1.25;color:#0a0a0a;&quot;>Hi there,</h2>
+          <p style=&quot;margin:0 0 18px;font-size:14px;line-height:1.65;color:#374151;&quot;>
+            You've been invited to join the workspace <strong>Marketing Team</strong> on Tasky.
+          </p>
+
+    <p style=&quot;margin:0 0 20px;&quot;>
+      <a
+        href=&quot;https://app.tasky.example/signup?email=new%40example.com&amp;amp;workspace=ws_123&quot;
+        style=&quot;display:inline-block;background:#047857;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:10px;font-size:14px;font-weight:600;&quot;
+      >
+        Accept invitation
+      </a>
+    </p>
+  
+          <p style=&quot;margin:0;font-size:12px;line-height:1.6;color:#71717a;&quot;>
+            If you didn't expect this invitation, you can safely ignore this email.
+          </p>
+        </div>
+
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>
+          Tasky • Track tasks • Focus better • Stay consistent
+        </p>
+      </div>
+    </div>
+  </body>
+</html>"></iframe></div>
+    <div class="frame mobile"><header>Mobile · 375px</header><iframe srcdoc="<!DOCTYPE html>
+<html lang=&quot;en&quot;>
+  <head>
+    <meta charset=&quot;utf-8&quot; />
+    <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; />
+  </head>
+  <body style=&quot;margin:0;padding:0;background:#f4f4f5;&quot;>
+    <span style=&quot;display:none;font-size:1px;color:#f4f4f5;max-height:0;max-width:0;opacity:0;overflow:hidden;&quot;>Join the Marketing Team workspace on Tasky.</span>
+    <div style=&quot;margin:0;background:#f4f4f5;padding:28px 14px;font-family:Inter,'Segoe UI',Arial,sans-serif;color:#0a0a0a;&quot;>
+      <div style=&quot;max-width:560px;margin:0 auto;&quot;>
+        <table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; align=&quot;center&quot; style=&quot;margin:0 auto 12px;&quot;>
+          <tr>
+            <td style=&quot;padding:6px 10px;border-radius:999px;background:#e6f2ee;color:#047857;font-size:12px;font-weight:600;letter-spacing:.02em;&quot;>
+              Tasky
+            </td>
+          </tr>
+        </table>
+
+        <div style=&quot;background:#ffffff;border:1px solid #e4e4e7;border-radius:16px;box-shadow:0 8px 24px rgba(10,10,10,.06);padding:28px;&quot;>
+
+          <h2 style=&quot;margin:0 0 10px;font-size:22px;line-height:1.25;color:#0a0a0a;&quot;>Hi there,</h2>
+          <p style=&quot;margin:0 0 18px;font-size:14px;line-height:1.65;color:#374151;&quot;>
+            You've been invited to join the workspace <strong>Marketing Team</strong> on Tasky.
+          </p>
+
+    <p style=&quot;margin:0 0 20px;&quot;>
+      <a
+        href=&quot;https://app.tasky.example/signup?email=new%40example.com&amp;amp;workspace=ws_123&quot;
+        style=&quot;display:inline-block;background:#047857;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:10px;font-size:14px;font-weight:600;&quot;
+      >
+        Accept invitation
+      </a>
+    </p>
+  
+          <p style=&quot;margin:0;font-size:12px;line-height:1.6;color:#71717a;&quot;>
+            If you didn't expect this invitation, you can safely ignore this email.
+          </p>
+        </div>
+
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>
+          Tasky • Track tasks • Focus better • Stay consistent
+        </p>
+      </div>
+    </div>
+  </body>
+</html>"></iframe></div>
+    <div><header style="font-size:12px;color:#71717a;padding:6px 0;">Plain-text part</header><pre>Hi there,
+
+You've been invited to join the workspace "Marketing Team" on Tasky.
+
+Accept the invitation: https://app.tasky.example/signup?email=new%40example.com&amp;workspace=ws_123
+
+If you didn't expect this invitation, you can safely ignore this email.</pre></div>
+  </div>
+</section>
+<section id="p4">
+  <h2>Invite (named recipient)</h2>
+  <p class="subject">Subject: You've been invited to Marketing Team on Tasky</p>
+
+  <div class="frames">
+    <div class="frame desktop"><header>Desktop · 700px</header><iframe srcdoc="<!DOCTYPE html>
+<html lang=&quot;en&quot;>
+  <head>
+    <meta charset=&quot;utf-8&quot; />
+    <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; />
+  </head>
+  <body style=&quot;margin:0;padding:0;background:#f4f4f5;&quot;>
+    <span style=&quot;display:none;font-size:1px;color:#f4f4f5;max-height:0;max-width:0;opacity:0;overflow:hidden;&quot;>Join the Marketing Team workspace on Tasky.</span>
+    <div style=&quot;margin:0;background:#f4f4f5;padding:28px 14px;font-family:Inter,'Segoe UI',Arial,sans-serif;color:#0a0a0a;&quot;>
+      <div style=&quot;max-width:560px;margin:0 auto;&quot;>
+        <table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; align=&quot;center&quot; style=&quot;margin:0 auto 12px;&quot;>
+          <tr>
+            <td style=&quot;padding:6px 10px;border-radius:999px;background:#e6f2ee;color:#047857;font-size:12px;font-weight:600;letter-spacing:.02em;&quot;>
+              Tasky
+            </td>
+          </tr>
+        </table>
+
+        <div style=&quot;background:#ffffff;border:1px solid #e4e4e7;border-radius:16px;box-shadow:0 8px 24px rgba(10,10,10,.06);padding:28px;&quot;>
+
+          <h2 style=&quot;margin:0 0 10px;font-size:22px;line-height:1.25;color:#0a0a0a;&quot;>Hi Joe,</h2>
+          <p style=&quot;margin:0 0 18px;font-size:14px;line-height:1.65;color:#374151;&quot;>
+            You've been invited to join the workspace <strong>Marketing Team</strong> on Tasky.
+          </p>
+
+    <p style=&quot;margin:0 0 20px;&quot;>
+      <a
+        href=&quot;https://app.tasky.example/signup&quot;
+        style=&quot;display:inline-block;background:#047857;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:10px;font-size:14px;font-weight:600;&quot;
+      >
+        Accept invitation
+      </a>
+    </p>
+  
+          <p style=&quot;margin:0;font-size:12px;line-height:1.6;color:#71717a;&quot;>
+            If you didn't expect this invitation, you can safely ignore this email.
+          </p>
+        </div>
+
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>
+          Tasky • Track tasks • Focus better • Stay consistent
+        </p>
+      </div>
+    </div>
+  </body>
+</html>"></iframe></div>
+    <div class="frame mobile"><header>Mobile · 375px</header><iframe srcdoc="<!DOCTYPE html>
+<html lang=&quot;en&quot;>
+  <head>
+    <meta charset=&quot;utf-8&quot; />
+    <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; />
+  </head>
+  <body style=&quot;margin:0;padding:0;background:#f4f4f5;&quot;>
+    <span style=&quot;display:none;font-size:1px;color:#f4f4f5;max-height:0;max-width:0;opacity:0;overflow:hidden;&quot;>Join the Marketing Team workspace on Tasky.</span>
+    <div style=&quot;margin:0;background:#f4f4f5;padding:28px 14px;font-family:Inter,'Segoe UI',Arial,sans-serif;color:#0a0a0a;&quot;>
+      <div style=&quot;max-width:560px;margin:0 auto;&quot;>
+        <table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; align=&quot;center&quot; style=&quot;margin:0 auto 12px;&quot;>
+          <tr>
+            <td style=&quot;padding:6px 10px;border-radius:999px;background:#e6f2ee;color:#047857;font-size:12px;font-weight:600;letter-spacing:.02em;&quot;>
+              Tasky
+            </td>
+          </tr>
+        </table>
+
+        <div style=&quot;background:#ffffff;border:1px solid #e4e4e7;border-radius:16px;box-shadow:0 8px 24px rgba(10,10,10,.06);padding:28px;&quot;>
+
+          <h2 style=&quot;margin:0 0 10px;font-size:22px;line-height:1.25;color:#0a0a0a;&quot;>Hi Joe,</h2>
+          <p style=&quot;margin:0 0 18px;font-size:14px;line-height:1.65;color:#374151;&quot;>
+            You've been invited to join the workspace <strong>Marketing Team</strong> on Tasky.
+          </p>
+
+    <p style=&quot;margin:0 0 20px;&quot;>
+      <a
+        href=&quot;https://app.tasky.example/signup&quot;
+        style=&quot;display:inline-block;background:#047857;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:10px;font-size:14px;font-weight:600;&quot;
+      >
+        Accept invitation
+      </a>
+    </p>
+  
+          <p style=&quot;margin:0;font-size:12px;line-height:1.6;color:#71717a;&quot;>
+            If you didn't expect this invitation, you can safely ignore this email.
+          </p>
+        </div>
+
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>
+          Tasky • Track tasks • Focus better • Stay consistent
+        </p>
+      </div>
+    </div>
+  </body>
+</html>"></iframe></div>
+    <div><header style="font-size:12px;color:#71717a;padding:6px 0;">Plain-text part</header><pre>Hi Joe,
+
+You've been invited to join the workspace "Marketing Team" on Tasky.
+
+Accept the invitation: https://app.tasky.example/signup
+
+If you didn't expect this invitation, you can safely ignore this email.</pre></div>
+  </div>
+</section>
+<section id="p5">
+  <h2>Added to workspace (existing user)</h2>
+  <p class="subject">Subject: You've been added to Marketing Team on Tasky</p>
+
+  <div class="frames">
+    <div class="frame desktop"><header>Desktop · 700px</header><iframe srcdoc="<!DOCTYPE html>
+<html lang=&quot;en&quot;>
+  <head>
+    <meta charset=&quot;utf-8&quot; />
+    <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; />
+  </head>
+  <body style=&quot;margin:0;padding:0;background:#f4f4f5;&quot;>
+    <span style=&quot;display:none;font-size:1px;color:#f4f4f5;max-height:0;max-width:0;opacity:0;overflow:hidden;&quot;>You now have access to Marketing Team on Tasky.</span>
+    <div style=&quot;margin:0;background:#f4f4f5;padding:28px 14px;font-family:Inter,'Segoe UI',Arial,sans-serif;color:#0a0a0a;&quot;>
+      <div style=&quot;max-width:560px;margin:0 auto;&quot;>
+        <table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; align=&quot;center&quot; style=&quot;margin:0 auto 12px;&quot;>
+          <tr>
+            <td style=&quot;padding:6px 10px;border-radius:999px;background:#e6f2ee;color:#047857;font-size:12px;font-weight:600;letter-spacing:.02em;&quot;>
+              Tasky
+            </td>
+          </tr>
+        </table>
+
+        <div style=&quot;background:#ffffff;border:1px solid #e4e4e7;border-radius:16px;box-shadow:0 8px 24px rgba(10,10,10,.06);padding:28px;&quot;>
+
+          <h2 style=&quot;margin:0 0 10px;font-size:22px;line-height:1.25;color:#0a0a0a;&quot;>Hi Joe,</h2>
+          <p style=&quot;margin:0 0 18px;font-size:14px;line-height:1.65;color:#374151;&quot;>
+            You've been added to the workspace <strong>Marketing Team</strong> on Tasky. It's already available in your account.
+          </p>
+
+    <p style=&quot;margin:0 0 20px;&quot;>
+      <a
+        href=&quot;https://app.tasky.example/dashboard&quot;
+        style=&quot;display:inline-block;background:#047857;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:10px;font-size:14px;font-weight:600;&quot;
+      >
+        Open workspace
+      </a>
+    </p>
+  
+          <p style=&quot;margin:0;font-size:12px;line-height:1.6;color:#71717a;&quot;>
+            If you think this was a mistake, you can leave the workspace from its settings page.
+          </p>
+        </div>
+
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>
+          Tasky • Track tasks • Focus better • Stay consistent
+        </p>
+      </div>
+    </div>
+  </body>
+</html>"></iframe></div>
+    <div class="frame mobile"><header>Mobile · 375px</header><iframe srcdoc="<!DOCTYPE html>
+<html lang=&quot;en&quot;>
+  <head>
+    <meta charset=&quot;utf-8&quot; />
+    <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; />
+  </head>
+  <body style=&quot;margin:0;padding:0;background:#f4f4f5;&quot;>
+    <span style=&quot;display:none;font-size:1px;color:#f4f4f5;max-height:0;max-width:0;opacity:0;overflow:hidden;&quot;>You now have access to Marketing Team on Tasky.</span>
+    <div style=&quot;margin:0;background:#f4f4f5;padding:28px 14px;font-family:Inter,'Segoe UI',Arial,sans-serif;color:#0a0a0a;&quot;>
+      <div style=&quot;max-width:560px;margin:0 auto;&quot;>
+        <table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; align=&quot;center&quot; style=&quot;margin:0 auto 12px;&quot;>
+          <tr>
+            <td style=&quot;padding:6px 10px;border-radius:999px;background:#e6f2ee;color:#047857;font-size:12px;font-weight:600;letter-spacing:.02em;&quot;>
+              Tasky
+            </td>
+          </tr>
+        </table>
+
+        <div style=&quot;background:#ffffff;border:1px solid #e4e4e7;border-radius:16px;box-shadow:0 8px 24px rgba(10,10,10,.06);padding:28px;&quot;>
+
+          <h2 style=&quot;margin:0 0 10px;font-size:22px;line-height:1.25;color:#0a0a0a;&quot;>Hi Joe,</h2>
+          <p style=&quot;margin:0 0 18px;font-size:14px;line-height:1.65;color:#374151;&quot;>
+            You've been added to the workspace <strong>Marketing Team</strong> on Tasky. It's already available in your account.
+          </p>
+
+    <p style=&quot;margin:0 0 20px;&quot;>
+      <a
+        href=&quot;https://app.tasky.example/dashboard&quot;
+        style=&quot;display:inline-block;background:#047857;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:10px;font-size:14px;font-weight:600;&quot;
+      >
+        Open workspace
+      </a>
+    </p>
+  
+          <p style=&quot;margin:0;font-size:12px;line-height:1.6;color:#71717a;&quot;>
+            If you think this was a mistake, you can leave the workspace from its settings page.
+          </p>
+        </div>
+
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>
+          Tasky • Track tasks • Focus better • Stay consistent
+        </p>
+      </div>
+    </div>
+  </body>
+</html>"></iframe></div>
+    <div><header style="font-size:12px;color:#71717a;padding:6px 0;">Plain-text part</header><pre>Hi Joe,
+
+You've been added to the workspace "Marketing Team" on Tasky.
+
+Open it here: https://app.tasky.example/dashboard</pre></div>
+  </div>
+</section>
+<section id="p6">
+  <h2>Escaping check (hostile input)</h2>
+  <p class="subject">Subject: You've been invited to &lt;a href="https://evil.example"&gt;Click to claim your prize&lt;/a&gt;&lt;img src=x onerror=alert(1)&gt; on Tasky</p>
+  <p class="note">⚠ Workspace name contains raw HTML — it must render as literal text, not as a link or image.</p>
+  <div class="frames">
+    <div class="frame desktop"><header>Desktop · 700px</header><iframe srcdoc="<!DOCTYPE html>
+<html lang=&quot;en&quot;>
+  <head>
+    <meta charset=&quot;utf-8&quot; />
+    <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; />
+  </head>
+  <body style=&quot;margin:0;padding:0;background:#f4f4f5;&quot;>
+    <span style=&quot;display:none;font-size:1px;color:#f4f4f5;max-height:0;max-width:0;opacity:0;overflow:hidden;&quot;>Join the &amp;lt;a href=&amp;quot;https://evil.example&amp;quot;&amp;gt;Click to claim your prize&amp;lt;/a&amp;gt;&amp;lt;img src=x onerror=alert(1)&amp;gt; workspace on Tasky.</span>
+    <div style=&quot;margin:0;background:#f4f4f5;padding:28px 14px;font-family:Inter,'Segoe UI',Arial,sans-serif;color:#0a0a0a;&quot;>
+      <div style=&quot;max-width:560px;margin:0 auto;&quot;>
+        <table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; align=&quot;center&quot; style=&quot;margin:0 auto 12px;&quot;>
+          <tr>
+            <td style=&quot;padding:6px 10px;border-radius:999px;background:#e6f2ee;color:#047857;font-size:12px;font-weight:600;letter-spacing:.02em;&quot;>
+              Tasky
+            </td>
+          </tr>
+        </table>
+
+        <div style=&quot;background:#ffffff;border:1px solid #e4e4e7;border-radius:16px;box-shadow:0 8px 24px rgba(10,10,10,.06);padding:28px;&quot;>
+
+          <h2 style=&quot;margin:0 0 10px;font-size:22px;line-height:1.25;color:#0a0a0a;&quot;>Hi &amp;lt;b&amp;gt;Joe&amp;lt;/b&amp;gt;,</h2>
+          <p style=&quot;margin:0 0 18px;font-size:14px;line-height:1.65;color:#374151;&quot;>
+            You've been invited to join the workspace <strong>&amp;lt;a href=&amp;quot;https://evil.example&amp;quot;&amp;gt;Click to claim your prize&amp;lt;/a&amp;gt;&amp;lt;img src=x onerror=alert(1)&amp;gt;</strong> on Tasky.
+          </p>
+
+    <p style=&quot;margin:0 0 20px;&quot;>
+      <a
+        href=&quot;https://app.tasky.example/signup&quot;
+        style=&quot;display:inline-block;background:#047857;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:10px;font-size:14px;font-weight:600;&quot;
+      >
+        Accept invitation
+      </a>
+    </p>
+  
+          <p style=&quot;margin:0;font-size:12px;line-height:1.6;color:#71717a;&quot;>
+            If you didn't expect this invitation, you can safely ignore this email.
+          </p>
+        </div>
+
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>
+          Tasky • Track tasks • Focus better • Stay consistent
+        </p>
+      </div>
+    </div>
+  </body>
+</html>"></iframe></div>
+    <div class="frame mobile"><header>Mobile · 375px</header><iframe srcdoc="<!DOCTYPE html>
+<html lang=&quot;en&quot;>
+  <head>
+    <meta charset=&quot;utf-8&quot; />
+    <meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; />
+  </head>
+  <body style=&quot;margin:0;padding:0;background:#f4f4f5;&quot;>
+    <span style=&quot;display:none;font-size:1px;color:#f4f4f5;max-height:0;max-width:0;opacity:0;overflow:hidden;&quot;>Join the &amp;lt;a href=&amp;quot;https://evil.example&amp;quot;&amp;gt;Click to claim your prize&amp;lt;/a&amp;gt;&amp;lt;img src=x onerror=alert(1)&amp;gt; workspace on Tasky.</span>
+    <div style=&quot;margin:0;background:#f4f4f5;padding:28px 14px;font-family:Inter,'Segoe UI',Arial,sans-serif;color:#0a0a0a;&quot;>
+      <div style=&quot;max-width:560px;margin:0 auto;&quot;>
+        <table role=&quot;presentation&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; border=&quot;0&quot; align=&quot;center&quot; style=&quot;margin:0 auto 12px;&quot;>
+          <tr>
+            <td style=&quot;padding:6px 10px;border-radius:999px;background:#e6f2ee;color:#047857;font-size:12px;font-weight:600;letter-spacing:.02em;&quot;>
+              Tasky
+            </td>
+          </tr>
+        </table>
+
+        <div style=&quot;background:#ffffff;border:1px solid #e4e4e7;border-radius:16px;box-shadow:0 8px 24px rgba(10,10,10,.06);padding:28px;&quot;>
+
+          <h2 style=&quot;margin:0 0 10px;font-size:22px;line-height:1.25;color:#0a0a0a;&quot;>Hi &amp;lt;b&amp;gt;Joe&amp;lt;/b&amp;gt;,</h2>
+          <p style=&quot;margin:0 0 18px;font-size:14px;line-height:1.65;color:#374151;&quot;>
+            You've been invited to join the workspace <strong>&amp;lt;a href=&amp;quot;https://evil.example&amp;quot;&amp;gt;Click to claim your prize&amp;lt;/a&amp;gt;&amp;lt;img src=x onerror=alert(1)&amp;gt;</strong> on Tasky.
+          </p>
+
+    <p style=&quot;margin:0 0 20px;&quot;>
+      <a
+        href=&quot;https://app.tasky.example/signup&quot;
+        style=&quot;display:inline-block;background:#047857;color:#ffffff;text-decoration:none;padding:11px 18px;border-radius:10px;font-size:14px;font-weight:600;&quot;
+      >
+        Accept invitation
+      </a>
+    </p>
+  
+          <p style=&quot;margin:0;font-size:12px;line-height:1.6;color:#71717a;&quot;>
+            If you didn't expect this invitation, you can safely ignore this email.
+          </p>
+        </div>
+
+        <p style=&quot;margin:12px 0 0;text-align:center;font-size:12px;color:#71717a;&quot;>
+          Tasky • Track tasks • Focus better • Stay consistent
+        </p>
+      </div>
+    </div>
+  </body>
+</html>"></iframe></div>
+    <div><header style="font-size:12px;color:#71717a;padding:6px 0;">Plain-text part</header><pre>Hi &lt;b&gt;Joe&lt;/b&gt;,
+
+You've been invited to join the workspace "&lt;a href="https://evil.example"&gt;Click to claim your prize&lt;/a&gt;&lt;img src=x onerror=alert(1)&gt;" on Tasky.
+
+Accept the invitation: https://app.tasky.example/signup
+
+If you didn't expect this invitation, you can safely ignore this email.</pre></div>
+  </div>
+</section>
+<script>
+  document.querySelectorAll('nav button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('nav button').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('section').forEach(function (s) { s.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.target).classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>
