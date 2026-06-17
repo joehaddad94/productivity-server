@@ -5,7 +5,7 @@ import type { WorkspaceRole } from '../common/assert-member';
  * Returns a Prisma WHERE fragment that restricts task visibility based on
  * the requester's role and canSeeAllTasks flag.
  *
- *   owner / admin  → tasks they created OR tasks they assigned to others
+ *   owner / admin  → tasks they created OR assigned to others OR assigned to them
  *   member + canSeeAllTasks=true   → all workspace tasks (empty fragment)
  *   member + canSeeAllTasks=false  → tasks they created OR are assigned to
  */
@@ -19,6 +19,7 @@ export function buildTaskVisibilityWhere(
       OR: [
         { creatorId: userId },
         { assignees: { some: { assignedById: userId } } },
+        { assignees: { some: { userId } } },
       ],
     };
   }
