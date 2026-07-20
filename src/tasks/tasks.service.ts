@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { assertMember } from '../common/assert-member';
+import { assertMember, type WorkspaceRole } from '../common/assert-member';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Prisma, Task } from '@prisma/client';
@@ -147,11 +147,7 @@ export class TasksService {
     }
 
     if (dto.assigneeIds && dto.assigneeIds.length > 0) {
-      if (role !== 'owner' && role !== 'admin') {
-        throw new ForbiddenException(
-          'Only owner or admin can assign tasks',
-        );
-      }
+      this.assertCanAssign(role, userId, dto.assigneeIds);
       await this.assertUsersInWorkspace(workspaceId, dto.assigneeIds);
       const seen = new Set(assigneeRows.map((r) => r.userId));
       for (const uid of dto.assigneeIds) {
@@ -240,6 +236,26 @@ export class TasksService {
     );
   }
 
+  /**
+   * Assignment permission: owner/admin may assign anyone; a plain member may
+   * assign *only themselves* (self-assignment — required so the personal rollup
+   * can pull a member's own team tasks into their day). See
+   * docs/task-model-and-rollup.md §6.2.
+   */
+  private assertCanAssign(
+    role: WorkspaceRole,
+    requesterId: string,
+    targetUserIds: string[],
+  ): void {
+    if (role === 'owner' || role === 'admin') return;
+    const onlySelf = targetUserIds.every((id) => id === requesterId);
+    if (!onlySelf) {
+      throw new ForbiddenException(
+        'Members can only assign tasks to themselves',
+      );
+    }
+  }
+
   private async assertUsersInWorkspace(
     workspaceId: string,
     userIds: string[],
@@ -265,9 +281,7 @@ export class TasksService {
       workspaceId,
       requesterId,
     );
-    if (role !== 'owner' && role !== 'admin') {
-      throw new ForbiddenException('Only owner or admin can assign tasks');
-    }
+    this.assertCanAssign(role, requesterId, userIds);
     await this.assertUsersInWorkspace(workspaceId, userIds);
 
     const task = await this.prisma.task.findFirst({

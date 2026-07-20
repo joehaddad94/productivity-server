@@ -14,7 +14,11 @@ import { BulkTaskAction } from './dto/bulk-task.dto';
 describe('TasksService', () => {
   let service: TasksService;
   let prisma: {
-    workspaceMember: { findUnique: jest.Mock; findMany: jest.Mock };
+    workspaceMember: {
+      findUnique: jest.Mock;
+      findMany: jest.Mock;
+      count: jest.Mock;
+    };
     task: {
       findMany: jest.Mock;
       count: jest.Mock;
@@ -81,6 +85,7 @@ describe('TasksService', () => {
       workspaceMember: {
         findUnique: jest.fn(),
         findMany: jest.fn(),
+        count: jest.fn().mockResolvedValue(1),
       },
       task: {
         findMany: jest.fn(),
@@ -803,6 +808,71 @@ describe('TasksService', () => {
       expect(result).toEqual({ affected: 0 });
       expect(prisma.task.updateMany).not.toHaveBeenCalled();
       expect(analytics.logStat).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('assignment permission (self-assign carve-out)', () => {
+    const OTHER = 'user-2';
+
+    it('lets a plain member self-assign on create', async () => {
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        id: 'm-1',
+        role: 'member',
+        canSeeAllTasks: false,
+      });
+      const task = makeTask();
+      prisma.task.create.mockResolvedValue(task);
+
+      await expect(
+        service.create(WS, USER, { title: 'Mine', assigneeIds: [USER] }),
+      ).resolves.toEqual(task);
+
+      expect(prisma.task.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          assignees: {
+            createMany: { data: [{ userId: USER, assignedById: USER }] },
+          },
+        }),
+      });
+    });
+
+    it('forbids a plain member from assigning someone else on create', async () => {
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        id: 'm-1',
+        role: 'member',
+        canSeeAllTasks: false,
+      });
+
+      await expect(
+        service.create(WS, USER, { title: 'X', assigneeIds: [OTHER] }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.task.create).not.toHaveBeenCalled();
+    });
+
+    it('still lets an admin assign another user on create', async () => {
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        id: 'm-1',
+        role: 'admin',
+        canSeeAllTasks: true,
+      });
+      const task = makeTask();
+      prisma.task.create.mockResolvedValue(task);
+
+      await expect(
+        service.create(WS, USER, { title: 'For other', assigneeIds: [OTHER] }),
+      ).resolves.toEqual(task);
+    });
+
+    it('forbids a plain member from assigning someone else via addAssignees', async () => {
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        id: 'm-1',
+        role: 'member',
+        canSeeAllTasks: false,
+      });
+
+      await expect(
+        service.addAssignees(WS, 'task-1', USER, [OTHER]),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });
