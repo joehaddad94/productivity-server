@@ -128,7 +128,6 @@ model WorkspaceMember {
   userId         String  @map("user_id")
   workspaceId    String  @map("workspace_id")
   role           String  @default("member")
-  canSeeAllTasks Boolean @default(false) @map("can_see_all_tasks")
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

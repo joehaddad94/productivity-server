@@ -143,11 +143,10 @@ describe('TasksService', () => {
     notifications = module.get(NotificationsService);
     jest.clearAllMocks();
 
-    // Default: user is a member with canSeeAllTasks=true (so visibility filter is empty)
+    // Default: user is a plain member (sees tasks they created OR are assigned to)
     prisma.workspaceMember.findUnique.mockResolvedValue({
       id: 'm-1',
       role: 'member',
-      canSeeAllTasks: true,
     });
     taskStatuses.getDefaultOpenStatusId.mockResolvedValue(OPEN_STATUS);
     taskStatuses.assertStatusInWorkspace.mockResolvedValue(undefined);
@@ -348,9 +347,19 @@ describe('TasksService', () => {
       const result = await service.findOne(WS, 'task-1', USER);
 
       expect(result).toEqual(task);
+      // The default mock is a plain member, so the query is scoped by the
+      // member visibility filter (tasks they created OR are assigned to).
       expect(prisma.task.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'task-1', workspaceId: WS, deletedAt: null },
+          where: {
+            id: 'task-1',
+            workspaceId: WS,
+            deletedAt: null,
+            OR: [
+              { creatorId: USER },
+              { assignees: { some: { userId: USER } } },
+            ],
+          },
         }),
       );
     });
@@ -818,7 +827,6 @@ describe('TasksService', () => {
       prisma.workspaceMember.findUnique.mockResolvedValue({
         id: 'm-1',
         role: 'member',
-        canSeeAllTasks: false,
       });
       const task = makeTask();
       prisma.task.create.mockResolvedValue(task);
@@ -840,7 +848,6 @@ describe('TasksService', () => {
       prisma.workspaceMember.findUnique.mockResolvedValue({
         id: 'm-1',
         role: 'member',
-        canSeeAllTasks: false,
       });
 
       await expect(
@@ -853,7 +860,6 @@ describe('TasksService', () => {
       prisma.workspaceMember.findUnique.mockResolvedValue({
         id: 'm-1',
         role: 'admin',
-        canSeeAllTasks: true,
       });
       const task = makeTask();
       prisma.task.create.mockResolvedValue(task);
@@ -867,7 +873,6 @@ describe('TasksService', () => {
       prisma.workspaceMember.findUnique.mockResolvedValue({
         id: 'm-1',
         role: 'member',
-        canSeeAllTasks: false,
       });
 
       await expect(

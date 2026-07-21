@@ -94,7 +94,6 @@ export class WorkspacesService {
     });
     membershipCache.set(membershipKey(userId, workspace.id), {
       role: 'owner',
-      canSeeAllTasks: false,
     });
 
     await this.taskStatuses.seedDefaultsForWorkspace(workspace.id);
@@ -290,10 +289,8 @@ export class WorkspacesService {
     targetUserId: string,
     dto: UpdateMemberDto,
   ): Promise<WorkspaceMember> {
-    if (dto.role === undefined && dto.canSeeAllTasks === undefined) {
-      throw new BadRequestException(
-        'Must provide at least one of: role, canSeeAllTasks',
-      );
+    if (dto.role === undefined) {
+      throw new BadRequestException('Must provide a role');
     }
 
     const { role: requesterRole } = await assertMember(
@@ -318,18 +315,11 @@ export class WorkspacesService {
 
     const updated = await this.prisma.workspaceMember.update({
       where: { userId_workspaceId: { userId: targetUserId, workspaceId } },
-      data: {
-        ...(dto.role !== undefined ? { role: dto.role } : {}),
-        ...(dto.canSeeAllTasks !== undefined
-          ? { canSeeAllTasks: dto.canSeeAllTasks }
-          : {}),
-      },
+      data: { role: dto.role },
     });
 
-    // Invalidate cache if role changed so the next request loads the new role
-    if (dto.role !== undefined) {
-      membershipCache.delete(membershipKey(targetUserId, workspaceId));
-    }
+    // Invalidate cache so the next request loads the new role
+    membershipCache.delete(membershipKey(targetUserId, workspaceId));
 
     return updated;
   }

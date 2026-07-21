@@ -3,7 +3,6 @@ import type { WorkspaceRole } from './assert-member';
 
 export type CachedMembership = {
   role: WorkspaceRole;
-  canSeeAllTasks: boolean;
 };
 
 // Keyed on "userId:workspaceId". TTL 60s.

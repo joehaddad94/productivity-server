@@ -2,28 +2,33 @@ import { Prisma } from '@prisma/client';
 import type { WorkspaceRole } from '../common/assert-member';
 
 /**
- * Returns a Prisma WHERE fragment that restricts task visibility based on
- * the requester's role and canSeeAllTasks flag.
+ * Returns a Prisma WHERE fragment that restricts task visibility based on the
+ * requester's role. Visibility keys off a task's ASSIGNMENT STATE, not on who
+ * happens to be "involved":
  *
- *   owner / admin  → tasks they created OR assigned to others OR assigned to them
- *   member + canSeeAllTasks=true   → all workspace tasks (empty fragment)
- *   member + canSeeAllTasks=false  → tasks they created OR are assigned to
+ *   - A task with NO assignees is private to its creator (a personal draft).
+ *   - A task with ≥1 assignee is visible to the whole leadership layer.
+ *
+ *   owner / admin  → every assigned task in the workspace, PLUS their own
+ *                    (unassigned) tasks. Owner and admin are identical here;
+ *                    "owner" only means they created the workspace.
+ *   member         → tasks assigned to them, PLUS tasks they created.
+ *
+ * Self-assigning is therefore the act that promotes a private draft into a
+ * task the owner/admins can see.
  */
 export function buildTaskVisibilityWhere(
   userId: string,
   role: WorkspaceRole,
-  canSeeAllTasks: boolean,
 ): Prisma.TaskWhereInput {
   if (role === 'owner' || role === 'admin') {
     return {
       OR: [
+        { assignees: { some: {} } },
         { creatorId: userId },
-        { assignees: { some: { assignedById: userId } } },
-        { assignees: { some: { userId } } },
       ],
     };
   }
-  if (canSeeAllTasks) return {};
   return {
     OR: [
       { creatorId: userId },
@@ -34,10 +39,10 @@ export function buildTaskVisibilityWhere(
 
 /**
  * Returns a Prisma WHERE fragment for tasks the user should be NOTIFIED about,
- * regardless of role: creator, assignee, or assigner. Used by the notification
- * scheduler so e.g. an admin assigned to a task by someone else still gets a
- * due-date reminder, and members with canSeeAllTasks=true don't get spammed for
- * tasks they have nothing to do with.
+ * regardless of role: creator, assignee, or assigner. Kept separate from
+ * visibility on purpose — an owner/admin can SEE every assigned task, but
+ * should only be reminded about the ones they created, were assigned, or
+ * assigned to someone else.
  */
 export function buildTaskRelevanceWhere(userId: string): Prisma.TaskWhereInput {
   return {

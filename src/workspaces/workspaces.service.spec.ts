@@ -350,7 +350,6 @@ describe('WorkspacesService', () => {
     it('soft-deletes workspace when user is owner', async () => {
       prisma.workspaceMember.findUnique.mockResolvedValue({
         role: 'owner',
-        canSeeAllTasks: false,
         workspaceId: 'ws-1',
       });
       prisma.workspace.update.mockResolvedValue({
@@ -369,7 +368,6 @@ describe('WorkspacesService', () => {
     it('throws ForbiddenException when user is member but not owner', async () => {
       prisma.workspaceMember.findUnique.mockResolvedValue({
         role: 'member',
-        canSeeAllTasks: true,
         workspaceId: 'ws-1',
       });
 

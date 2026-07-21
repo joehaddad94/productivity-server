@@ -5,43 +5,46 @@ const USER = 'user-1';
 describe('buildTaskVisibilityWhere', () => {
   describe('owner / admin', () => {
     for (const role of ['owner', 'admin'] as const) {
-      it(`${role} can see tasks they created, assigned to others, OR are assigned to`, () => {
-        const where = buildTaskVisibilityWhere(USER, role, false);
+      it(`${role} sees every assigned task OR tasks they created`, () => {
+        const where = buildTaskVisibilityWhere(USER, role);
 
-        expect(where.OR).toEqual(
-          expect.arrayContaining([
-            { creatorId: USER },
-            { assignees: { some: { assignedById: USER } } },
-            { assignees: { some: { userId: USER } } },
-          ]),
-        );
+        expect(where.OR).toEqual([
+          { assignees: { some: {} } },
+          { creatorId: USER },
+        ]);
       });
 
-      // Regression: an owner/admin assigned a task by someone else must still see it.
-      // Previously the filter only matched creatorId / assignedById, so admin
-      // assignees were filtered out of list(), findOne() (404), reorder, and bulk.
-      it(`${role} assigned by someone else matches via the assignee branch`, () => {
-        const where = buildTaskVisibilityWhere(USER, role, false);
+      // Any task with at least one assignee is visible to the whole leadership
+      // layer — including tasks they neither created nor were assigned/assigned-by.
+      it(`${role} matches any assigned task via the "some assignee" branch`, () => {
+        const where = buildTaskVisibilityWhere(USER, role);
 
-        expect(where.OR).toContainEqual({
-          assignees: { some: { userId: USER } },
-        });
+        expect(where.OR).toContainEqual({ assignees: { some: {} } });
+      });
+
+      // Their own unassigned (private) tasks stay visible to them.
+      it(`${role} still sees their own unassigned tasks`, () => {
+        const where = buildTaskVisibilityWhere(USER, role);
+
+        expect(where.OR).toContainEqual({ creatorId: USER });
       });
     }
   });
 
   describe('member', () => {
-    it('with canSeeAllTasks=true sees everything (empty filter)', () => {
-      expect(buildTaskVisibilityWhere(USER, 'member', true)).toEqual({});
-    });
-
-    it('with canSeeAllTasks=false sees tasks they created OR are assigned to', () => {
-      const where = buildTaskVisibilityWhere(USER, 'member', false);
+    it('sees tasks they created OR are assigned to — and nothing else', () => {
+      const where = buildTaskVisibilityWhere(USER, 'member');
 
       expect(where.OR).toEqual([
         { creatorId: USER },
         { assignees: { some: { userId: USER } } },
       ]);
+    });
+
+    it('does NOT get an empty (see-everything) filter', () => {
+      const where = buildTaskVisibilityWhere(USER, 'member');
+
+      expect(where).not.toEqual({});
     });
   });
 });

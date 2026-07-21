@@ -52,12 +52,8 @@ export class TasksService {
     userId: string,
     query: QueryTaskDto,
   ): Promise<{ tasks: TaskWithDetails[]; total: number }> {
-    const { role, canSeeAllTasks } = await assertMember(
-      this.prisma,
-      workspaceId,
-      userId,
-    );
-    const visibility = buildTaskVisibilityWhere(userId, role, canSeeAllTasks);
+    const { role } = await assertMember(this.prisma, workspaceId, userId);
+    const visibility = buildTaskVisibilityWhere(userId, role);
 
     const where: Prisma.TaskWhereInput = {
       workspaceId,
@@ -417,12 +413,8 @@ export class TasksService {
     id: string,
     userId: string,
   ): Promise<TaskWithDetails> {
-    const { role, canSeeAllTasks } = await assertMember(
-      this.prisma,
-      workspaceId,
-      userId,
-    );
-    const visibility = buildTaskVisibilityWhere(userId, role, canSeeAllTasks);
+    const { role } = await assertMember(this.prisma, workspaceId, userId);
+    const visibility = buildTaskVisibilityWhere(userId, role);
 
     const task = await this.prisma.task.findFirst({
       where: { id, workspaceId, deletedAt: null, ...visibility },
@@ -717,12 +709,8 @@ export class TasksService {
     userId: string,
     ids: string[],
   ): Promise<void> {
-    const { role, canSeeAllTasks } = await assertMember(
-      this.prisma,
-      workspaceId,
-      userId,
-    );
-    const visibility = buildTaskVisibilityWhere(userId, role, canSeeAllTasks);
+    const { role } = await assertMember(this.prisma, workspaceId, userId);
+    const visibility = buildTaskVisibilityWhere(userId, role);
 
     // Only reorder tasks the user can actually see
     const visibleTasks = await this.prisma.task.findMany({
@@ -765,12 +753,8 @@ export class TasksService {
     userId: string,
     dto: BulkTaskDto,
   ): Promise<{ affected: number }> {
-    const { role, canSeeAllTasks } = await assertMember(
-      this.prisma,
-      workspaceId,
-      userId,
-    );
-    const visibility = buildTaskVisibilityWhere(userId, role, canSeeAllTasks);
+    const { role } = await assertMember(this.prisma, workspaceId, userId);
+    const visibility = buildTaskVisibilityWhere(userId, role);
 
     const tasks = await this.prisma.task.findMany({
       where: {
