@@ -131,7 +131,9 @@ export class TasksService {
 
     // Build initial assignee list:
     //   - subtask → inherit parent's assignees (preserve assignedById)
-    //   - explicit assigneeIds → owner/admin only, no self-assignment
+    //   - explicit assigneeIds → owner/admin may assign anyone; a plain member
+    //     may assign only themselves (assertCanAssign). Member self-assignment
+    //     is what lets the personal rollup pull team tasks into "My Tasks".
     let assigneeRows: { userId: string; assignedById: string }[] = [];
     // Only assignees added explicitly on THIS task — not the ones inherited
     // from a parent — trigger notifications and an "assigned" activity entry.
