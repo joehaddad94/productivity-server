@@ -133,6 +133,9 @@ export class TasksService {
     //   - subtask → inherit parent's assignees (preserve assignedById)
     //   - explicit assigneeIds → owner/admin only, no self-assignment
     let assigneeRows: { userId: string; assignedById: string }[] = [];
+    // Only assignees added explicitly on THIS task — not the ones inherited
+    // from a parent — trigger notifications and an "assigned" activity entry.
+    const explicitlyAssignedIds: string[] = [];
 
     if (dto.parentTaskId) {
       const parent = await this.prisma.task.findFirst({
@@ -154,6 +157,7 @@ export class TasksService {
         if (!seen.has(uid)) {
           assigneeRows.push({ userId: uid, assignedById: userId });
           seen.add(uid);
+          explicitlyAssignedIds.push(uid);
         }
       }
     }
@@ -181,16 +185,14 @@ export class TasksService {
     // Fire-and-forget: log creation activity + assignment notifications
     void this.logActivity(created.id, userId, 'created', undefined, workspaceId);
 
-    if (assigneeRows.length > 0) {
-      const recipientIds = assigneeRows
-        .map((r) => r.userId)
-        .filter((uid) => uid !== userId);
+    if (explicitlyAssignedIds.length > 0) {
+      const recipientIds = explicitlyAssignedIds.filter((uid) => uid !== userId);
       if (recipientIds.length > 0) {
         void this.notifyAssigned(workspaceId, created.id, created.title, recipientIds);
       }
-      for (const row of assigneeRows) {
+      for (const uid of explicitlyAssignedIds) {
         void this.logActivity(created.id, userId, 'assigned', {
-          assigneeId: row.userId,
+          assigneeId: uid,
         }, workspaceId);
       }
     }
