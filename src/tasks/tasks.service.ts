@@ -307,7 +307,12 @@ export class TasksService {
     });
 
     if (newAssigneeIds.length > 0) {
-      void this.notifyAssigned(workspaceId, taskId, task.title, newAssigneeIds);
+      // Don't notify people for assigning themselves (members self-assign to
+      // pull tasks into their personal rollup) — matches create().
+      const recipientIds = newAssigneeIds.filter((uid) => uid !== requesterId);
+      if (recipientIds.length > 0) {
+        void this.notifyAssigned(workspaceId, taskId, task.title, recipientIds);
+      }
       const assigneeUsers = await this.prisma.user.findMany({
         where: { id: { in: newAssigneeIds } },
         select: { id: true, name: true, email: true },
