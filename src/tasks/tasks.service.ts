@@ -637,7 +637,10 @@ export class TasksService {
         data: task.assignees.map((a) => ({
           taskId: created.id,
           userId: a.userId,
-          assignedById: task.creatorId,
+          // Preserve the original assigner — visibility and reminders key off
+          // assignedById, so overwriting it with the creator would drop the
+          // real assigner from every future recurring instance.
+          assignedById: a.assignedById,
         })),
       });
     }
