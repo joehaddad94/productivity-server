@@ -336,9 +336,13 @@ export class TasksService {
       workspaceId,
       requesterId,
     );
-    if (role !== 'owner' && role !== 'admin') {
+    // Owner/admin may remove anyone; a plain member may remove only
+    // themselves — the mirror of self-assignment (assertCanAssign), so a
+    // member who self-assigned a task can also drop it without an admin.
+    const isPrivileged = role === 'owner' || role === 'admin';
+    if (!isPrivileged && targetUserId !== requesterId) {
       throw new ForbiddenException(
-        'Only owner or admin can remove assignees',
+        'Members can only remove themselves from a task',
       );
     }
 
