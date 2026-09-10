@@ -279,6 +279,10 @@ describe('WorkspacesService', () => {
       prisma.workspaceMember.findFirst.mockResolvedValue({
         workspace: mockWorkspace,
       });
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        role: 'owner',
+        workspaceId: 'ws-1',
+      });
       prisma.workspace.update.mockResolvedValue({
         ...mockWorkspace,
         name: 'Updated Name',
@@ -309,6 +313,10 @@ describe('WorkspacesService', () => {
       prisma.workspaceMember.findFirst.mockResolvedValue({
         workspace: mockWorkspace,
       });
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        role: 'owner',
+        workspaceId: 'ws-1',
+      });
       prisma.workspace.findFirst
         .mockResolvedValueOnce({ id: 'other-ws' })
         .mockResolvedValueOnce(null);
@@ -331,6 +339,10 @@ describe('WorkspacesService', () => {
       prisma.workspaceMember.findFirst.mockResolvedValue({
         workspace: mockWorkspace,
       });
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        role: 'owner',
+        workspaceId: 'ws-1',
+      });
       prisma.workspace.findFirst.mockResolvedValue(null);
       prisma.workspace.update.mockResolvedValue(mockWorkspace);
 
@@ -343,6 +355,56 @@ describe('WorkspacesService', () => {
       expect(prisma.workspace.findFirst).toHaveBeenCalledWith({
         where: { slug: 'my-workspace', deletedAt: null, id: { not: 'ws-1' } },
       });
+    });
+  });
+
+  describe('update — authorisation', () => {
+    it('rejects a plain member', async () => {
+      prisma.workspaceMember.findFirst.mockResolvedValue({
+        workspace: mockWorkspace,
+      });
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        role: 'member',
+        workspaceId: 'ws-1',
+      });
+
+      await expect(
+        service.update('ws-1', 'user-1', { name: 'Renamed' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.workspace.update).not.toHaveBeenCalled();
+    });
+
+    it('allows an admin to rename', async () => {
+      prisma.workspaceMember.findFirst.mockResolvedValue({
+        workspace: mockWorkspace,
+      });
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        role: 'admin',
+        workspaceId: 'ws-1',
+      });
+      prisma.workspace.update.mockResolvedValue({
+        ...mockWorkspace,
+        name: 'Renamed',
+      });
+
+      await expect(
+        service.update('ws-1', 'user-1', { name: 'Renamed' }),
+      ).resolves.toBeDefined();
+    });
+
+    it('reserves isPersonal for the owner', async () => {
+      prisma.workspaceMember.findFirst.mockResolvedValue({
+        workspace: mockWorkspace,
+      });
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        role: 'admin',
+        workspaceId: 'ws-1',
+      });
+
+      await expect(
+        service.update('ws-1', 'user-1', { isPersonal: true }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.workspace.update).not.toHaveBeenCalled();
     });
   });
 

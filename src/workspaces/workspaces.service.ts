@@ -125,6 +125,25 @@ export class WorkspacesService {
   ): Promise<Workspace> {
     await this.findOne(id, userId);
 
+    // Renaming a workspace, changing its slug or flipping isPersonal are
+    // administrative acts, but this only checked membership — so any member
+    // could do all three, while deleting and inviting were already owner-only.
+    //
+    // isPersonal is the one that matters most: MeService picks the personal
+    // workspace by that flag and the rollup's creator branch is scoped to it,
+    // so flipping it changes what surfaces in other people's My Tasks.
+    const { role } = await assertMember(this.prisma, id, userId);
+    if (role !== 'owner' && role !== 'admin') {
+      throw new ForbiddenException(
+        'Only the workspace owner or an admin can update it',
+      );
+    }
+    if (dto.isPersonal !== undefined && role !== 'owner') {
+      throw new ForbiddenException(
+        'Only the workspace owner can change whether it is personal',
+      );
+    }
+
     const data: { name?: string; slug?: string; isPersonal?: boolean } = {};
     if (dto.name !== undefined) data.name = dto.name.trim();
     if (dto.isPersonal !== undefined) data.isPersonal = dto.isPersonal;
