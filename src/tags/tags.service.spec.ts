@@ -37,6 +37,7 @@ describe('TagsService', () => {
     completedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
+    contentText: null,
     deletedAt: null,
   };
 
