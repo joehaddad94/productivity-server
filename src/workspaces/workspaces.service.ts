@@ -64,8 +64,12 @@ export class WorkspacesService {
   async create(dto: CreateWorkspaceDto, userId: string): Promise<Workspace> {
     const slug = dto.slug?.trim() || this.slugify(dto.name) || 'workspace';
 
+    // Only live workspaces can conflict. Without the deletedAt filter a
+    // soft-deleted workspace kept reserving its own name forever: delete
+    // "Work", try to create "Work" again, and the user was told they already
+    // have one — pointing at a row they can no longer see.
     const memberships = await this.prisma.workspaceMember.findMany({
-      where: { userId },
+      where: { userId, workspace: { deletedAt: null } },
       include: { workspace: true },
     });
     const userSlugs = memberships.map((m) => m.workspace.slug);
