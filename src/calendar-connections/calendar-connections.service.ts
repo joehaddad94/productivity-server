@@ -6,6 +6,7 @@ import {
 import { createHmac, timingSafeEqual } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { decryptSecret, encryptSecret } from '../common/secret-crypto';
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -146,13 +147,17 @@ export class CalendarConnectionsService {
       create: {
         userId,
         provider: 'google',
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token ?? null,
+        accessToken: encryptSecret(tokens.access_token),
+        refreshToken: tokens.refresh_token
+          ? encryptSecret(tokens.refresh_token)
+          : null,
         expiresAt,
       },
       update: {
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token ?? undefined,
+        accessToken: encryptSecret(tokens.access_token),
+        refreshToken: tokens.refresh_token
+          ? encryptSecret(tokens.refresh_token)
+          : undefined,
         expiresAt,
       },
     });
@@ -194,13 +199,17 @@ export class CalendarConnectionsService {
       create: {
         userId,
         provider: 'microsoft',
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token ?? null,
+        accessToken: encryptSecret(tokens.access_token),
+        refreshToken: tokens.refresh_token
+          ? encryptSecret(tokens.refresh_token)
+          : null,
         expiresAt,
       },
       update: {
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token ?? undefined,
+        accessToken: encryptSecret(tokens.access_token),
+        refreshToken: tokens.refresh_token
+          ? encryptSecret(tokens.refresh_token)
+          : undefined,
         expiresAt,
       },
     });
@@ -319,9 +328,9 @@ export class CalendarConnectionsService {
     userId: string,
   ): Promise<string> {
     if (!conn.expiresAt || conn.expiresAt > new Date(Date.now() + 60_000)) {
-      return conn.accessToken;
+      return decryptSecret(conn.accessToken);
     }
-    if (!conn.refreshToken) return conn.accessToken;
+    if (!conn.refreshToken) return decryptSecret(conn.accessToken);
 
     const clientId = this.config.get<string>('GOOGLE_CALENDAR_CLIENT_ID');
     const clientSecret = this.config.get<string>(
@@ -331,7 +340,7 @@ export class CalendarConnectionsService {
     const body = new URLSearchParams({
       client_id: clientId!,
       client_secret: clientSecret!,
-      refresh_token: conn.refreshToken,
+      refresh_token: decryptSecret(conn.refreshToken),
       grant_type: 'refresh_token',
     });
 
@@ -341,14 +350,14 @@ export class CalendarConnectionsService {
       body: body.toString(),
     });
 
-    if (!res.ok) return conn.accessToken;
+    if (!res.ok) return decryptSecret(conn.accessToken);
 
     const tokens = (await res.json()) as GoogleTokenResponse;
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
 
     await this.prisma.calendarConnection.update({
       where: { userId_provider: { userId, provider: 'google' } },
-      data: { accessToken: tokens.access_token, expiresAt },
+      data: { accessToken: encryptSecret(tokens.access_token), expiresAt },
     });
 
     return tokens.access_token;
@@ -418,9 +427,9 @@ export class CalendarConnectionsService {
     userId: string,
   ): Promise<string> {
     if (!conn.expiresAt || conn.expiresAt > new Date(Date.now() + 60_000)) {
-      return conn.accessToken;
+      return decryptSecret(conn.accessToken);
     }
-    if (!conn.refreshToken) return conn.accessToken;
+    if (!conn.refreshToken) return decryptSecret(conn.accessToken);
 
     const clientId = this.config.get<string>('MICROSOFT_CLIENT_ID');
     const clientSecret = this.config.get<string>('MICROSOFT_CLIENT_SECRET');
@@ -430,7 +439,7 @@ export class CalendarConnectionsService {
       client_id: clientId!,
       client_secret: clientSecret!,
       redirect_uri: redirectUri!,
-      refresh_token: conn.refreshToken,
+      refresh_token: decryptSecret(conn.refreshToken),
       grant_type: 'refresh_token',
       scope: 'Calendars.Read offline_access',
     });
@@ -444,14 +453,14 @@ export class CalendarConnectionsService {
       },
     );
 
-    if (!res.ok) return conn.accessToken;
+    if (!res.ok) return decryptSecret(conn.accessToken);
 
     const tokens = (await res.json()) as MicrosoftTokenResponse;
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
 
     await this.prisma.calendarConnection.update({
       where: { userId_provider: { userId, provider: 'microsoft' } },
-      data: { accessToken: tokens.access_token, expiresAt },
+      data: { accessToken: encryptSecret(tokens.access_token), expiresAt },
     });
 
     return tokens.access_token;
