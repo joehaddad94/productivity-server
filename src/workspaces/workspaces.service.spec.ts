@@ -422,6 +422,11 @@ describe('WorkspacesService', () => {
         ...mockWorkspace,
         deletedAt: new Date(),
       });
+      // remove() now evicts each member's cached membership after the delete.
+      prisma.workspaceMember.findMany.mockResolvedValue([
+        { userId: 'user-1' },
+        { userId: 'user-2' },
+      ]);
 
       await service.remove('ws-1', 'user-1');
 

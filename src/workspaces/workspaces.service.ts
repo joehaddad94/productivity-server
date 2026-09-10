@@ -181,6 +181,17 @@ export class WorkspacesService {
       where: { id },
       data: { deletedAt: new Date() },
     });
+
+    // assertMember caches membership for 60s. removeMember and updateMember
+    // both evict on change; deleting the workspace did not, so every member
+    // kept working access to a deleted workspace for up to a minute.
+    const members = await this.prisma.workspaceMember.findMany({
+      where: { workspaceId: id },
+      select: { userId: true },
+    });
+    for (const m of members) {
+      membershipCache.delete(membershipKey(m.userId, id));
+    }
   }
 
   // --- Member management ---
