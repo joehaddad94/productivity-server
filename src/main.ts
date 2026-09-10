@@ -4,6 +4,7 @@ import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { SentryGlobalFilter } from '@sentry/nestjs/setup';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { trace } from '@opentelemetry/api';
 import type { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
@@ -48,6 +49,18 @@ async function bootstrap() {
     });
     next();
   });
+
+  // Security response headers. `contentSecurityPolicy` is disabled because
+  // this process serves JSON and, outside production, the Swagger UI — whose
+  // inline scripts a default CSP would block. The frontend sets its own CSP.
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+      // The OAuth callbacks redirect back to the frontend origin.
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
 
   app.use(cookieParser());
 
