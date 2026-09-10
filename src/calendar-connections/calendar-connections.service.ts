@@ -1,7 +1,8 @@
 import {
-  Injectable,
-  NotFoundException,
   BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { ConfigService } from '@nestjs/config';
@@ -34,6 +35,8 @@ export interface CalendarEvent {
 
 @Injectable()
 export class CalendarConnectionsService {
+  private readonly logger = new Logger(CalendarConnectionsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
@@ -352,7 +355,16 @@ export class CalendarConnectionsService {
       body: body.toString(),
     });
 
-    if (!res.ok) return decryptSecret(conn.accessToken);
+    if (!res.ok) {
+      // A refresh rejected because the user revoked access will never succeed.
+      // Returning the stale token silently made every downstream call fail with
+      // no way back to a "reconnect your calendar" prompt. Log it at least, so
+      // the failure is visible rather than invisible.
+      this.logger.warn(
+        `Calendar token refresh failed for connection ${conn.id} (status ${res.status}); it may need reconnecting`,
+      );
+      return decryptSecret(conn.accessToken);
+    }
 
     const tokens = (await res.json()) as GoogleTokenResponse;
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
@@ -455,7 +467,16 @@ export class CalendarConnectionsService {
       },
     );
 
-    if (!res.ok) return decryptSecret(conn.accessToken);
+    if (!res.ok) {
+      // A refresh rejected because the user revoked access will never succeed.
+      // Returning the stale token silently made every downstream call fail with
+      // no way back to a "reconnect your calendar" prompt. Log it at least, so
+      // the failure is visible rather than invisible.
+      this.logger.warn(
+        `Calendar token refresh failed for connection ${conn.id} (status ${res.status}); it may need reconnecting`,
+      );
+      return decryptSecret(conn.accessToken);
+    }
 
     const tokens = (await res.json()) as MicrosoftTokenResponse;
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
