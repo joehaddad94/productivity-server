@@ -21,6 +21,7 @@ function normalizeRoute(url: string): string {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const httpLogger = new Logger('HTTP');
+  const logger = new Logger('Bootstrap');
 
   app.use((req: Request, res: Response, next: NextFunction) => {
     const { method, url } = req;
@@ -60,13 +61,19 @@ async function bootstrap() {
   // Requests with no Origin header (server-to-server, curl, health checks, and
   // the Next.js /api proxy) are still allowed — the header is only present on
   // cross-origin browser requests, which are exactly the ones being gated.
+  // Falls back to APP_URL, which production already sets to the frontend
+  // origin for magic links, so a deployment that never sets CORS_ORIGINS still
+  // allows its own frontend instead of locking it out.
   const allowedOrigins = (
     process.env.CORS_ORIGINS ??
+    process.env.APP_URL ??
     'http://localhost:3000,http://localhost:5173'
   )
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
+
+  logger.log(`CORS allowlist: ${allowedOrigins.join(', ')}`);
 
   app.enableCors({
     origin(origin, callback) {
