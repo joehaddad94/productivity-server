@@ -50,8 +50,31 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
+  // Allowlist, not reflection.
+  //
+  // `origin: true` reflects whatever Origin the request carries. Combined with
+  // `credentials: true` and an auth cookie that is SameSite=None in production,
+  // that let ANY site a signed-in user visited call this API with their cookie
+  // attached and read the response.
+  //
+  // Requests with no Origin header (server-to-server, curl, health checks, and
+  // the Next.js /api proxy) are still allowed — the header is only present on
+  // cross-origin browser requests, which are exactly the ones being gated.
+  const allowedOrigins = (
+    process.env.CORS_ORIGINS ??
+    'http://localhost:3000,http://localhost:5173'
+  )
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: true, // or set to your frontend origin(s), e.g. ['http://localhost:5173']
+    origin(origin, callback) {
+      // Deny by omitting the header rather than throwing: the browser blocks
+      // the response either way, and throwing turns every probe into a 500
+      // that shows up as a server error in the logs and in Sentry.
+      callback(null, !origin || allowedOrigins.includes(origin));
+    },
     credentials: true,
   });
 
