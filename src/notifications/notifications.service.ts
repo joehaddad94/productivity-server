@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as webpush from 'web-push';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { SseService } from '../sse/sse.service';
 import { UpdateNotificationSettingsDto } from './dto/notification-settings.dto';
 import { SavePushSubscriptionDto } from './dto/push-subscription.dto';
 
@@ -63,6 +64,7 @@ export class NotificationsService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly config: ConfigService,
+    private readonly sse: SseService,
   ) {
     const publicKey = this.config.get<string>('VAPID_PUBLIC_KEY');
     const privateKey = this.config.get<string>('VAPID_PRIVATE_KEY');
@@ -196,6 +198,9 @@ export class NotificationsService {
           body: params.body,
         },
       });
+      // Tell open tabs a notification landed. The bell used to poll every 30
+      // seconds to find this out, on a connection that was already open.
+      this.sse.emit(params.workspaceId, { type: 'notifications_changed' });
     }
 
     if (settings.email) {

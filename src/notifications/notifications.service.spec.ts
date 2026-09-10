@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from './notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { SseService } from '../sse/sse.service';
 
 jest.mock('web-push', () => ({
   setVapidDetails: jest.fn(),
@@ -90,6 +91,8 @@ describe('NotificationsService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: MailService, useValue: mockMail },
         { provide: ConfigService, useValue: { get: configGet } },
+        // NotificationsService announces new in-app notifications over SSE.
+        { provide: SseService, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 
