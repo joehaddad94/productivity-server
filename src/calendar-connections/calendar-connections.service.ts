@@ -221,6 +221,8 @@ export class CalendarConnectionsService {
     const connections = await this.prisma.calendarConnection.findMany({
       where: { userId },
       select: { id: true, provider: true, createdAt: true, expiresAt: true },
+      // Rendered as a list in Settings; unordered rows reshuffled the cards.
+      orderBy: { provider: 'asc' },
     });
     return connections;
   }

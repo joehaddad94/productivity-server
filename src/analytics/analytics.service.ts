@@ -159,6 +159,8 @@ export class AnalyticsService {
         include: {
           user: { select: { id: true, email: true, name: true, avatarUrl: true } },
         },
+        // The team analytics table reordered itself between loads without this.
+        orderBy: { user: { email: 'asc' } },
       }),
       this.prisma.dailyStat.groupBy({
         by: ['userId'],
