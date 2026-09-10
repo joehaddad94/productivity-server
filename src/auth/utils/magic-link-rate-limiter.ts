@@ -7,9 +7,23 @@ export class MagicLinkRateLimiter {
     string,
     { count: number; resetAt: number }
   >();
+  private lastSweep = Date.now();
+
+  /** Drop entries whose window has closed; they can never deny anything. */
+  private sweep(now: number): void {
+    for (const [key, entry] of this.counts) {
+      if (now >= entry.resetAt) this.counts.delete(key);
+    }
+    this.lastSweep = now;
+  }
 
   check(email: string): void {
     const now = Date.now();
+    // The map only ever grew: an entry was replaced when the same address came
+    // back, but an address seen once stayed forever. Sweep occasionally rather
+    // than on every call, which would be O(n) per request.
+    if (now - this.lastSweep > this.window) this.sweep(now);
+
     const entry = this.counts.get(email);
     if (!entry || now >= entry.resetAt) {
       this.counts.set(email, { count: 1, resetAt: now + this.window });
