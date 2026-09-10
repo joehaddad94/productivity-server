@@ -172,7 +172,11 @@ describe('ProjectsService', () => {
       expect(result).toEqual(mockProject);
       expect(prisma.project.findFirst).toHaveBeenCalledWith({
         where: { id: 'proj-1', workspaceId: WS, deletedAt: null },
-        include: { _count: { select: { notes: true, tasks: true } } },
+        include: {
+          _count: {
+            select: { notes: true, tasks: { where: { deletedAt: null } } },
+          },
+        },
       });
     });
 

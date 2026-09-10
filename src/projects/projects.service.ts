@@ -30,7 +30,17 @@ export class ProjectsService {
     const [projects, total] = await Promise.all([
       this.prisma.project.findMany({
         where,
-        include: { _count: { select: { notes: true, tasks: true } } },
+        include: {
+        _count: {
+          select: {
+            notes: true,
+            // Tasks are soft-deleted, and an unfiltered _count counts every
+            // related row — so deleted tasks kept inflating the project's
+            // badge. Notes are hard-deleted and need no filter.
+            tasks: { where: { deletedAt: null } },
+          },
+        },
+      },
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip,
@@ -68,7 +78,17 @@ export class ProjectsService {
 
     const project = await this.prisma.project.findFirst({
       where: { id, workspaceId, deletedAt: null },
-      include: { _count: { select: { notes: true, tasks: true } } },
+      include: {
+        _count: {
+          select: {
+            notes: true,
+            // Tasks are soft-deleted, and an unfiltered _count counts every
+            // related row — so deleted tasks kept inflating the project's
+            // badge. Notes are hard-deleted and need no filter.
+            tasks: { where: { deletedAt: null } },
+          },
+        },
+      },
     });
     if (!project) throw new NotFoundException('Project not found');
     return project as ProjectWithCount;
@@ -92,7 +112,17 @@ export class ProjectsService {
         ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.color !== undefined ? { color: dto.color } : {}),
       },
-      include: { _count: { select: { notes: true, tasks: true } } },
+      include: {
+        _count: {
+          select: {
+            notes: true,
+            // Tasks are soft-deleted, and an unfiltered _count counts every
+            // related row — so deleted tasks kept inflating the project's
+            // badge. Notes are hard-deleted and need no filter.
+            tasks: { where: { deletedAt: null } },
+          },
+        },
+      },
     }) as unknown as ProjectWithCount;
   }
 
