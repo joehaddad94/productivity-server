@@ -92,14 +92,23 @@ async function bootstrap() {
     }),
   );
 
-  const config = new DocumentBuilder()
-    .setTitle('Tasky API')
-    .setDescription('API for Tasky (notes, tasks, workspaces)')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  // The full API schema is an internal document: it enumerates every route,
+  // parameter and shape, which is a map for anyone probing the service. Serve
+  // it outside production only, or when explicitly switched on.
+  const swaggerEnabled =
+    process.env.ENABLE_SWAGGER === 'true' ||
+    process.env.NODE_ENV !== 'production';
+
+  if (swaggerEnabled) {
+    const config = new DocumentBuilder()
+      .setTitle('Tasky API')
+      .setDescription('API for Tasky (notes, tasks, workspaces)')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api', app, document);
+  }
 
   await app.listen(process.env.PORT ?? 8000);
 
