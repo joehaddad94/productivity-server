@@ -8,6 +8,7 @@ describe('AnalyticsService', () => {
   let service: AnalyticsService;
   let prisma: {
     workspaceMember: { findUnique: jest.Mock };
+    user: { findUnique: jest.Mock };
     dailyStat: {
       findMany: jest.Mock;
       upsert: jest.Mock;
@@ -41,6 +42,7 @@ describe('AnalyticsService', () => {
 
     const mockPrisma = {
       workspaceMember: { findUnique: jest.fn() },
+      user: { findUnique: jest.fn() },
       dailyStat: {
         findMany: jest.fn(),
         upsert: jest.fn(),
@@ -56,6 +58,9 @@ describe('AnalyticsService', () => {
 
     service = module.get<AnalyticsService>(AnalyticsService);
     prisma = module.get(PrismaService);
+
+    // computeStreak reads the user's timezone; default it for every test.
+    prisma.user.findUnique.mockResolvedValue({ timezone: 'UTC' });
     jest.clearAllMocks();
   });
 
@@ -161,6 +166,48 @@ describe('AnalyticsService', () => {
         const result = await service.getAnalytics(WS, USER, {});
 
         expect(result.totals.streak).toBe(1);
+      });
+
+      it('counts across a daylight-saving boundary', async () => {
+        // US spring-forward is 2026-03-08. Consecutive local midnights either
+        // side are 23 hours apart, so the old millisecond diff was 0.958 and
+        // matched neither `> 1` nor `=== 1`: the loop fell through without
+        // breaking or advancing and miscounted the streak.
+        jest.useFakeTimers().setSystemTime(new Date('2026-03-09T15:00:00Z'));
+        prisma.user.findUnique.mockResolvedValue({
+          timezone: 'America/New_York',
+        });
+        const day = (d: string) => new Date(`${d}T00:00:00Z`);
+        setupStreak([
+          makeStat(day('2026-03-09'), 1, 0),
+          makeStat(day('2026-03-08'), 1, 0),
+          makeStat(day('2026-03-07'), 1, 0),
+        ]);
+
+        const result = await service.getAnalytics(WS, USER, {});
+
+        expect(result.totals.streak).toBe(3);
+        jest.useRealTimers();
+      });
+
+      it("uses the user's timezone, not the server's, for today", async () => {
+        // 2026-03-10T02:00Z is still 2026-03-09 in New York (21:00 the day
+        // before). A streak ending on the 9th is therefore still live there,
+        // even though the server's UTC clock has already rolled over.
+        jest.useFakeTimers().setSystemTime(new Date('2026-03-10T02:00:00Z'));
+        prisma.user.findUnique.mockResolvedValue({
+          timezone: 'America/New_York',
+        });
+        const day = (d: string) => new Date(`${d}T00:00:00Z`);
+        setupStreak([
+          makeStat(day('2026-03-09'), 1, 0),
+          makeStat(day('2026-03-08'), 1, 0),
+        ]);
+
+        const result = await service.getAnalytics(WS, USER, {});
+
+        expect(result.totals.streak).toBe(2);
+        jest.useRealTimers();
       });
 
       it('returns 3 for three consecutive days', async () => {

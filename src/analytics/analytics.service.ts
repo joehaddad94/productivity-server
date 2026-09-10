@@ -18,38 +18,67 @@ export interface AnalyticsResult {
 export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private computeStreak(stats: DailyStat[]): number {
+  /** `DailyStat.date` is a DATE column, so its UTC parts ARE the calendar day. */
+  private static dayKey(date: Date): string {
+    return date.toISOString().slice(0, 10);
+  }
+
+  /** Today as YYYY-MM-DD in the user's own timezone (en-CA formats as ISO). */
+  private static todayInZone(timeZone: string): string {
+    try {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date());
+    } catch {
+      return new Date().toISOString().slice(0, 10);
+    }
+  }
+
+  /** Step a YYYY-MM-DD key back one day. Parsed as UTC, so DST cannot bite. */
+  private static previousDay(key: string): string {
+    const d = new Date(`${key}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  /**
+   * Consecutive days with activity, counting back from today.
+   *
+   * Compares YYYY-MM-DD keys rather than timestamp arithmetic. The previous
+   * implementation measured the gap between two local midnights in
+   * milliseconds and tested `diff === 1`, which is false across a daylight
+   * saving boundary where consecutive local midnights are 23 or 25 hours
+   * apart. Neither branch matched, so the loop fell through without breaking
+   * and without advancing, and the streak silently counted across a real gap.
+   *
+   * `timeZone` is the user's, not the server's. `today` used to come from
+   * `new Date().setHours(0,0,0,0)` in the server process's zone, so on a UTC
+   * host a user at UTC+3 saw their streak roll over at 03:00 local and one at
+   * UTC-5 at 19:00 the evening before.
+   */
+  private computeStreak(stats: DailyStat[], timeZone: string): number {
     if (stats.length === 0) return 0;
 
-    // Sort descending by date
-    const sorted = [...stats].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    const active = new Set(
+      stats
+        .filter((s) => s.tasksCompleted > 0 || s.focusMinutes > 0)
+        .map((s) => AnalyticsService.dayKey(s.date)),
     );
+    if (active.size === 0) return 0;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    let cursor = AnalyticsService.todayInZone(timeZone);
+    // A day that has not been worked yet does not end a streak; start from
+    // yesterday when today is still empty.
+    if (!active.has(cursor)) cursor = AnalyticsService.previousDay(cursor);
 
     let streak = 0;
-    let cursor = new Date(today);
-
-    for (const stat of sorted) {
-      const statDate = new Date(stat.date);
-      statDate.setHours(0, 0, 0, 0);
-
-      const diff =
-        (cursor.getTime() - statDate.getTime()) / (1000 * 60 * 60 * 24);
-
-      if (diff > 1) break;
-      if (diff === 0 || diff === 1) {
-        if (stat.tasksCompleted > 0 || stat.focusMinutes > 0) {
-          streak++;
-          cursor = statDate;
-        } else {
-          break;
-        }
-      }
+    while (active.has(cursor)) {
+      streak++;
+      cursor = AnalyticsService.previousDay(cursor);
     }
-
     return streak;
   }
 
@@ -88,13 +117,23 @@ export class AnalyticsService {
       { tasksCompleted: 0, focusMinutes: 0, streak: 0 },
     );
 
-    // Streak is computed over all stats for this user+workspace (not just the range)
-    const allStats = await this.prisma.dailyStat.findMany({
-      where: { workspaceId, userId },
-      orderBy: { date: 'desc' },
-    });
+    // Streak looks back past the requested range, but not without limit: this
+    // ran on every dashboard load and read every DailyStat row the user had
+    // ever accumulated. A streak can only span consecutive days, so a year of
+    // history is far more than any streak can use.
+    const [allStats, user] = await Promise.all([
+      this.prisma.dailyStat.findMany({
+        where: { workspaceId, userId },
+        orderBy: { date: 'desc' },
+        take: 400,
+      }),
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { timezone: true },
+      }),
+    ]);
 
-    totals.streak = this.computeStreak(allStats);
+    totals.streak = this.computeStreak(allStats, user?.timezone ?? 'UTC');
 
     return { dailyStats, totals };
   }
