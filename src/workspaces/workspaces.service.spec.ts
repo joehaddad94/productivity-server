@@ -239,6 +239,10 @@ describe('WorkspacesService', () => {
       expect(prisma.workspaceMember.findMany).toHaveBeenCalledWith({
         where: { userId: 'user-1', workspace: { deletedAt: null } },
         include: { workspace: true },
+        orderBy: [
+          { workspace: { isPersonal: 'desc' } },
+          { workspace: { createdAt: 'asc' } },
+        ],
       });
     });
   });

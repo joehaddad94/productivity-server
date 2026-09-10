@@ -105,6 +105,16 @@ export class WorkspacesService {
     const memberships = await this.prisma.workspaceMember.findMany({
       where: { userId, workspace: { deletedAt: null } },
       include: { workspace: true },
+      // Without an explicit order Postgres returns these in whatever order it
+      // likes, and that changes as rows are updated. It matters more than it
+      // looks: WorkspaceContext falls back to workspaces[0] when there is no
+      // stored selection, so an unordered list meant a user with no saved
+      // workspace could land in a different one on each load, and the list
+      // reshuffled under them after every write.
+      orderBy: [
+        { workspace: { isPersonal: 'desc' } },
+        { workspace: { createdAt: 'asc' } },
+      ],
     });
     return memberships.map((m) => m.workspace);
   }
@@ -184,6 +194,10 @@ export class WorkspacesService {
           select: { id: true, email: true, name: true, avatarUrl: true },
         },
       },
+      // Same reason: unordered rows made the member list reshuffle between
+      // refetches. WorkspaceMember has no createdAt, so order by the member's
+      // email — stable, and a predictable alphabetical list to scan.
+      orderBy: [{ user: { email: 'asc' } }],
     }) as Promise<MemberWithUser[]>;
   }
 
