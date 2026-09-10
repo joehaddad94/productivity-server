@@ -26,7 +26,7 @@ export function deriveBucket(
  * columns (pre-migration rows that predate status ids). Confirmed against live
  * data 2026-07-20: only `pending` / `in_progress` / `completed` occur.
  */
-function legacyKeyBucket(key: string): CanonicalBucket {
+export function legacyKeyBucket(key: string): CanonicalBucket {
   if (key === 'completed') return 'done';
   if (key === 'in_progress') return 'in_progress';
   return 'open';

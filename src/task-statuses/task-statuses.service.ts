@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertMember } from '../common/assert-member';
+import { deriveBucket, legacyKeyBucket } from './canonical-status';
 import type { WorkspaceTaskStatus } from '@prisma/client';
 import { CreateTaskStatusDto } from './dto/create-task-status.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
@@ -97,12 +98,22 @@ export class TaskStatusesService {
     return row;
   }
 
+  /**
+   * Whether a `Task.status` value counts as done.
+   *
+   * Routed through the canonical derivation (docs/task-model-and-rollup.md §6.1)
+   * so completion here and bucketing in the personal rollup can never disagree.
+   * Tolerates both shapes the column holds: a WorkspaceTaskStatus id, and the
+   * legacy bare keys (`pending` / `in_progress` / `completed`) still present on
+   * pre-migration rows.
+   */
   async isTerminal(workspaceId: string, statusId: string): Promise<boolean> {
     const row = await this.prisma.workspaceTaskStatus.findFirst({
       where: { id: statusId, workspaceId, archivedAt: null },
-      select: { isTerminal: true },
+      select: { key: true, isTerminal: true },
     });
-    return row?.isTerminal ?? false;
+    if (row) return deriveBucket(row) === 'done';
+    return legacyKeyBucket(statusId) === 'done';
   }
 
   async getDefaultOpenStatusId(workspaceId: string): Promise<string> {
