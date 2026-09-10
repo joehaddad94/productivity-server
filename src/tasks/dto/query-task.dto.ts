@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsDateString,
   IsEnum,
   IsInt,
   IsOptional,
@@ -28,14 +29,14 @@ export class QueryTaskDto {
     description: 'ISO date — include tasks due before this date',
   })
   @IsOptional()
-  @IsString()
+  @IsDateString()
   dueBefore?: string;
 
   @ApiPropertyOptional({
     description: 'ISO date — include tasks due after this date',
   })
   @IsOptional()
-  @IsString()
+  @IsDateString()
   dueAfter?: string;
 
   @ApiPropertyOptional({ description: 'Search in title and description' })

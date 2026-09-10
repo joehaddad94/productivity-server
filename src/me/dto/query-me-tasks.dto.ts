@@ -1,5 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum MeTasksLens {
@@ -20,12 +28,12 @@ export class QueryMeTasksDto {
 
   @ApiPropertyOptional({ description: 'ISO date — include tasks due on/before' })
   @IsOptional()
-  @IsString()
+  @IsDateString()
   dueBefore?: string;
 
   @ApiPropertyOptional({ description: 'ISO date — include tasks due on/after' })
   @IsOptional()
-  @IsString()
+  @IsDateString()
   dueAfter?: string;
 
   @ApiPropertyOptional({ description: 'Max records to return (default 200, max 500)' })
