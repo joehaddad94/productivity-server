@@ -34,6 +34,7 @@ export class NotesService {
 
     const where = {
       workspaceId,
+      deletedAt: null,
       ...(query.search
         ? {
             OR: [
@@ -121,7 +122,7 @@ export class NotesService {
     await assertMember(this.prisma, workspaceId, userId);
 
     const note = await this.prisma.note.findFirst({
-      where: { id, workspaceId },
+      where: { id, workspaceId, deletedAt: null },
     });
     if (!note) throw new NotFoundException('Note not found');
     return note;
@@ -152,6 +153,11 @@ export class NotesService {
 
   async remove(workspaceId: string, id: string, userId: string): Promise<void> {
     await this.findOne(workspaceId, id, userId);
-    await this.prisma.note.delete({ where: { id } });
+    // Soft delete, matching Task and Project. This used to be note.delete(),
+    // so an accidental deletion was permanent and unrecoverable.
+    await this.prisma.note.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
   }
 }

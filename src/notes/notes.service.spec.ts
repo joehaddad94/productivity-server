@@ -35,6 +35,7 @@ describe('NotesService', () => {
     completedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
+    deletedAt: null,
   };
 
   beforeEach(async () => {
@@ -236,7 +237,7 @@ describe('NotesService', () => {
 
       expect(result).toEqual(mockNote);
       expect(prisma.note.findFirst).toHaveBeenCalledWith({
-        where: { id: 'note-1', workspaceId: WS },
+        where: { id: 'note-1', workspaceId: WS, deletedAt: null },
       });
     });
 
@@ -340,15 +341,17 @@ describe('NotesService', () => {
       expect(prisma.note.delete).not.toHaveBeenCalled();
     });
 
-    it('hard-deletes the note', async () => {
+    it('soft-deletes the note', async () => {
       prisma.workspaceMember.findUnique.mockResolvedValue({ id: 'm-1' });
       prisma.note.findFirst.mockResolvedValue(mockNote);
-      prisma.note.delete.mockResolvedValue(mockNote);
+      prisma.note.update.mockResolvedValue({ ...mockNote, deletedAt: new Date() });
 
       await service.remove(WS, 'note-1', USER);
 
-      expect(prisma.note.delete).toHaveBeenCalledWith({
+      expect(prisma.note.delete).not.toHaveBeenCalled();
+      expect(prisma.note.update).toHaveBeenCalledWith({
         where: { id: 'note-1' },
+        data: { deletedAt: expect.any(Date) },
       });
     });
   });

@@ -231,6 +231,7 @@ model Note {
   completedAt  DateTime? @map("completed_at")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
 
   workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   project   Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
@@ -240,6 +241,7 @@ model Note {
   @@index([workspaceId])
   @@index([workspaceId, projectId])
   @@index([workspaceId, updatedAt])
+  @@index([workspaceId, deletedAt])
   @@map("notes")
 }
 
