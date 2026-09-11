@@ -16,6 +16,9 @@ describe('ProjectsService', () => {
       findFirst: jest.Mock;
       update: jest.Mock;
     };
+    task: { updateMany: jest.Mock };
+    note: { updateMany: jest.Mock };
+    $transaction: jest.Mock;
   };
 
   const WS = 'ws-1';
@@ -38,6 +41,10 @@ describe('ProjectsService', () => {
 
     const mockPrisma = {
       workspaceMember: { findUnique: jest.fn() },
+      task: { updateMany: jest.fn() },
+      note: { updateMany: jest.fn() },
+      // remove() batches the soft delete with the unlinking updates.
+      $transaction: jest.fn((ops: unknown[]) => Promise.all(ops)),
       project: {
         findMany: jest.fn(),
         count: jest.fn(),
@@ -172,7 +179,11 @@ describe('ProjectsService', () => {
       expect(result).toEqual(mockProject);
       expect(prisma.project.findFirst).toHaveBeenCalledWith({
         where: { id: 'proj-1', workspaceId: WS, deletedAt: null },
-        include: { _count: { select: { notes: true, tasks: true } } },
+        include: {
+          _count: {
+            select: { notes: true, tasks: { where: { deletedAt: null } } },
+          },
+        },
       });
     });
 
@@ -267,6 +278,16 @@ describe('ProjectsService', () => {
         where: { id: 'proj-1' },
         data: { deletedAt: expect.any(Date) },
       });
+      // Tasks and notes must not be left pointing at a project that is gone.
+      expect(prisma.task.updateMany).toHaveBeenCalledWith({
+        where: { projectId: 'proj-1', workspaceId: WS },
+        data: { projectId: null },
+      });
+      expect(prisma.note.updateMany).toHaveBeenCalledWith({
+        where: { projectId: 'proj-1', workspaceId: WS },
+        data: { projectId: null },
+      });
+      expect(prisma.$transaction).toHaveBeenCalled();
     });
   });
 });

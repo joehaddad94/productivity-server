@@ -3,22 +3,36 @@ import { ConfigService } from '@nestjs/config';
 import * as webpush from 'web-push';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { SseService } from '../sse/sse.service';
 import { UpdateNotificationSettingsDto } from './dto/notification-settings.dto';
 import { SavePushSubscriptionDto } from './dto/push-subscription.dto';
 
-function getLocalHour(timezone: string | null | undefined): number {
+/** Minutes since local midnight in the given IANA zone. */
+function getLocalMinutes(timezone: string | null | undefined): number {
   const tz = timezone ?? 'UTC';
   try {
     const parts = new Intl.DateTimeFormat('en-US', {
       timeZone: tz,
       hour: 'numeric',
+      minute: 'numeric',
       hour12: false,
     }).formatToParts(new Date());
-    const h = parts.find((p) => p.type === 'hour')?.value ?? '0';
-    return parseInt(h, 10) % 24;
+    const h = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0', 10);
+    const m = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0', 10);
+    return (h % 24) * 60 + m;
   } catch {
-    return new Date().getUTCHours();
+    const now = new Date();
+    return now.getUTCHours() * 60 + now.getUTCMinutes();
   }
+}
+
+/** "HH:MM" to minutes since midnight, or null if unparseable. */
+function toMinutes(hhmm: string): number | null {
+  const [rawH, rawM] = hhmm.split(':');
+  const h = parseInt(rawH ?? '', 10);
+  if (Number.isNaN(h)) return null;
+  const m = parseInt(rawM ?? '0', 10);
+  return h * 60 + (Number.isNaN(m) ? 0 : m);
 }
 
 function isInQuietHours(
@@ -27,13 +41,18 @@ function isInQuietHours(
   timezone: string | null | undefined,
 ): boolean {
   if (!start || !end) return false;
-  const localHour = getLocalHour(timezone);
-  const startH = parseInt(start.split(':')[0] ?? '0', 10);
-  const endH = parseInt(end.split(':')[0] ?? '0', 10);
-  if (startH === endH) return false;
-  // Handle overnight ranges (e.g., 22:00 → 08:00)
-  if (startH > endH) return localHour >= startH || localHour < endH;
-  return localHour >= startH && localHour < endH;
+  // Compare at minute resolution. Only the hour used to be parsed, so a quiet
+  // window of 22:30 behaved as 22:00, and `startH === endH` disabled any
+  // window inside a single hour (22:00–22:45) entirely — while Settings
+  // presents both as free time inputs.
+  const startM = toMinutes(start);
+  const endM = toMinutes(end);
+  if (startM === null || endM === null || startM === endM) return false;
+
+  const nowM = getLocalMinutes(timezone);
+  // Overnight ranges (e.g. 22:00 -> 08:00) wrap past midnight.
+  if (startM > endM) return nowM >= startM || nowM < endM;
+  return nowM >= startM && nowM < endM;
 }
 
 @Injectable()
@@ -45,6 +64,7 @@ export class NotificationsService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly config: ConfigService,
+    private readonly sse: SseService,
   ) {
     const publicKey = this.config.get<string>('VAPID_PUBLIC_KEY');
     const privateKey = this.config.get<string>('VAPID_PRIVATE_KEY');
@@ -178,6 +198,9 @@ export class NotificationsService {
           body: params.body,
         },
       });
+      // Tell open tabs a notification landed. The bell used to poll every 30
+      // seconds to find this out, on a connection that was already open.
+      this.sse.emit(params.workspaceId, { type: 'notifications_changed' });
     }
 
     if (settings.email) {

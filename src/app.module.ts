@@ -21,6 +21,7 @@ import { CalendarConnectionsModule } from './calendar-connections/calendar-conne
 import { BugReportsModule } from './bug-reports/bug-reports.module';
 import { TimerStateModule } from './timer-state/timer-state.module';
 import { SseModule } from './sse/sse.module';
+import { MeModule } from './me/me.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { SseModule } from './sse/sse.module';
     BugReportsModule,
     TimerStateModule,
     SseModule,
+    MeModule,
   ],
   controllers: [AppController],
   providers: [

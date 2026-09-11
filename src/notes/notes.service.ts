@@ -11,6 +11,30 @@ import { CreateNoteDto } from './dto/create-note.dto';
 import { UpdateNoteDto } from './dto/update-note.dto';
 import { QueryNoteDto } from './dto/query-note.dto';
 
+/**
+ * Plain text from TipTap's HTML, for the search column.
+ *
+ * Mirrors the client's getNotePreview: close block tags to a space so
+ * "<p>a</p><p>b</p>" does not collapse to "ab", decode the entities TipTap
+ * emits, then drop the remaining tags.
+ */
+function toPlainText(html: string | null | undefined): string | null {
+  if (!html) return null;
+  const text = html
+    .replace(/<\/(?:p|div|li|h[1-6]|blockquote|pre|tr)>/gi, ' ')
+    .replace(/<(?:br|hr)\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text.length > 0 ? text : null;
+}
+
 @Injectable()
 export class NotesService {
   private readonly logger = new Logger(NotesService.name);
@@ -34,6 +58,7 @@ export class NotesService {
 
     const where = {
       workspaceId,
+      deletedAt: null,
       ...(query.search
         ? {
             OR: [
@@ -41,7 +66,7 @@ export class NotesService {
                 title: { contains: query.search, mode: 'insensitive' as const },
               },
               {
-                content: {
+                contentText: {
                   contains: query.search,
                   mode: 'insensitive' as const,
                 },
@@ -96,6 +121,7 @@ export class NotesService {
         workspaceId,
         title: dto.title.trim(),
         content: dto.content,
+        contentText: toPlainText(dto.content),
         tags: dto.tags ?? [],
         projectId: dto.projectId,
         taskId: dto.taskId,
@@ -121,7 +147,7 @@ export class NotesService {
     await assertMember(this.prisma, workspaceId, userId);
 
     const note = await this.prisma.note.findFirst({
-      where: { id, workspaceId },
+      where: { id, workspaceId, deletedAt: null },
     });
     if (!note) throw new NotFoundException('Note not found');
     return note;
@@ -139,7 +165,9 @@ export class NotesService {
       where: { id },
       data: {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
-        ...(dto.content !== undefined ? { content: dto.content } : {}),
+        ...(dto.content !== undefined
+          ? { content: dto.content, contentText: toPlainText(dto.content) }
+          : {}),
         ...(dto.tags !== undefined ? { tags: dto.tags } : {}),
         // Relations: null → unlink, string → link, undefined → leave untouched.
         ...('projectId' in dto ? { projectId: dto.projectId ?? null } : {}),
@@ -152,6 +180,11 @@ export class NotesService {
 
   async remove(workspaceId: string, id: string, userId: string): Promise<void> {
     await this.findOne(workspaceId, id, userId);
-    await this.prisma.note.delete({ where: { id } });
+    // Soft delete, matching Task and Project. This used to be note.delete(),
+    // so an accidental deletion was permanent and unrecoverable.
+    await this.prisma.note.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
   }
 }

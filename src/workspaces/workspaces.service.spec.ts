@@ -239,6 +239,10 @@ describe('WorkspacesService', () => {
       expect(prisma.workspaceMember.findMany).toHaveBeenCalledWith({
         where: { userId: 'user-1', workspace: { deletedAt: null } },
         include: { workspace: true },
+        orderBy: [
+          { workspace: { isPersonal: 'desc' } },
+          { workspace: { createdAt: 'asc' } },
+        ],
       });
     });
   });
@@ -279,6 +283,10 @@ describe('WorkspacesService', () => {
       prisma.workspaceMember.findFirst.mockResolvedValue({
         workspace: mockWorkspace,
       });
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        role: 'owner',
+        workspaceId: 'ws-1',
+      });
       prisma.workspace.update.mockResolvedValue({
         ...mockWorkspace,
         name: 'Updated Name',
@@ -309,6 +317,10 @@ describe('WorkspacesService', () => {
       prisma.workspaceMember.findFirst.mockResolvedValue({
         workspace: mockWorkspace,
       });
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        role: 'owner',
+        workspaceId: 'ws-1',
+      });
       prisma.workspace.findFirst
         .mockResolvedValueOnce({ id: 'other-ws' })
         .mockResolvedValueOnce(null);
@@ -331,6 +343,10 @@ describe('WorkspacesService', () => {
       prisma.workspaceMember.findFirst.mockResolvedValue({
         workspace: mockWorkspace,
       });
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        role: 'owner',
+        workspaceId: 'ws-1',
+      });
       prisma.workspace.findFirst.mockResolvedValue(null);
       prisma.workspace.update.mockResolvedValue(mockWorkspace);
 
@@ -346,17 +362,71 @@ describe('WorkspacesService', () => {
     });
   });
 
+  describe('update — authorisation', () => {
+    it('rejects a plain member', async () => {
+      prisma.workspaceMember.findFirst.mockResolvedValue({
+        workspace: mockWorkspace,
+      });
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        role: 'member',
+        workspaceId: 'ws-1',
+      });
+
+      await expect(
+        service.update('ws-1', 'user-1', { name: 'Renamed' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.workspace.update).not.toHaveBeenCalled();
+    });
+
+    it('allows an admin to rename', async () => {
+      prisma.workspaceMember.findFirst.mockResolvedValue({
+        workspace: mockWorkspace,
+      });
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        role: 'admin',
+        workspaceId: 'ws-1',
+      });
+      prisma.workspace.update.mockResolvedValue({
+        ...mockWorkspace,
+        name: 'Renamed',
+      });
+
+      await expect(
+        service.update('ws-1', 'user-1', { name: 'Renamed' }),
+      ).resolves.toBeDefined();
+    });
+
+    it('reserves isPersonal for the owner', async () => {
+      prisma.workspaceMember.findFirst.mockResolvedValue({
+        workspace: mockWorkspace,
+      });
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        role: 'admin',
+        workspaceId: 'ws-1',
+      });
+
+      await expect(
+        service.update('ws-1', 'user-1', { isPersonal: true }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.workspace.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('remove', () => {
     it('soft-deletes workspace when user is owner', async () => {
       prisma.workspaceMember.findUnique.mockResolvedValue({
         role: 'owner',
-        canSeeAllTasks: false,
         workspaceId: 'ws-1',
       });
       prisma.workspace.update.mockResolvedValue({
         ...mockWorkspace,
         deletedAt: new Date(),
       });
+      // remove() now evicts each member's cached membership after the delete.
+      prisma.workspaceMember.findMany.mockResolvedValue([
+        { userId: 'user-1' },
+        { userId: 'user-2' },
+      ]);
 
       await service.remove('ws-1', 'user-1');
 
@@ -369,7 +439,6 @@ describe('WorkspacesService', () => {
     it('throws ForbiddenException when user is member but not owner', async () => {
       prisma.workspaceMember.findUnique.mockResolvedValue({
         role: 'member',
-        canSeeAllTasks: true,
         workspaceId: 'ws-1',
       });
 

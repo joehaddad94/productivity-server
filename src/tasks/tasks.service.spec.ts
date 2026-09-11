@@ -14,7 +14,11 @@ import { BulkTaskAction } from './dto/bulk-task.dto';
 describe('TasksService', () => {
   let service: TasksService;
   let prisma: {
-    workspaceMember: { findUnique: jest.Mock; findMany: jest.Mock };
+    workspaceMember: {
+      findUnique: jest.Mock;
+      findMany: jest.Mock;
+      count: jest.Mock;
+    };
     task: {
       findMany: jest.Mock;
       count: jest.Mock;
@@ -81,6 +85,7 @@ describe('TasksService', () => {
       workspaceMember: {
         findUnique: jest.fn(),
         findMany: jest.fn(),
+        count: jest.fn().mockResolvedValue(1),
       },
       task: {
         findMany: jest.fn(),
@@ -138,11 +143,10 @@ describe('TasksService', () => {
     notifications = module.get(NotificationsService);
     jest.clearAllMocks();
 
-    // Default: user is a member with canSeeAllTasks=true (so visibility filter is empty)
+    // Default: user is a plain member (sees tasks they created OR are assigned to)
     prisma.workspaceMember.findUnique.mockResolvedValue({
       id: 'm-1',
       role: 'member',
-      canSeeAllTasks: true,
     });
     taskStatuses.getDefaultOpenStatusId.mockResolvedValue(OPEN_STATUS);
     taskStatuses.assertStatusInWorkspace.mockResolvedValue(undefined);
@@ -343,9 +347,19 @@ describe('TasksService', () => {
       const result = await service.findOne(WS, 'task-1', USER);
 
       expect(result).toEqual(task);
+      // The default mock is a plain member, so the query is scoped by the
+      // member visibility filter (tasks they created OR are assigned to).
       expect(prisma.task.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'task-1', workspaceId: WS, deletedAt: null },
+          where: {
+            id: 'task-1',
+            workspaceId: WS,
+            deletedAt: null,
+            OR: [
+              { creatorId: USER },
+              { assignees: { some: { userId: USER } } },
+            ],
+          },
         }),
       );
     });
@@ -803,6 +817,67 @@ describe('TasksService', () => {
       expect(result).toEqual({ affected: 0 });
       expect(prisma.task.updateMany).not.toHaveBeenCalled();
       expect(analytics.logStat).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('assignment permission (self-assign carve-out)', () => {
+    const OTHER = 'user-2';
+
+    it('lets a plain member self-assign on create', async () => {
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        id: 'm-1',
+        role: 'member',
+      });
+      const task = makeTask();
+      prisma.task.create.mockResolvedValue(task);
+
+      await expect(
+        service.create(WS, USER, { title: 'Mine', assigneeIds: [USER] }),
+      ).resolves.toEqual(task);
+
+      expect(prisma.task.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          assignees: {
+            createMany: { data: [{ userId: USER, assignedById: USER }] },
+          },
+        }),
+      });
+    });
+
+    it('forbids a plain member from assigning someone else on create', async () => {
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        id: 'm-1',
+        role: 'member',
+      });
+
+      await expect(
+        service.create(WS, USER, { title: 'X', assigneeIds: [OTHER] }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.task.create).not.toHaveBeenCalled();
+    });
+
+    it('still lets an admin assign another user on create', async () => {
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        id: 'm-1',
+        role: 'admin',
+      });
+      const task = makeTask();
+      prisma.task.create.mockResolvedValue(task);
+
+      await expect(
+        service.create(WS, USER, { title: 'For other', assigneeIds: [OTHER] }),
+      ).resolves.toEqual(task);
+    });
+
+    it('forbids a plain member from assigning someone else via addAssignees', async () => {
+      prisma.workspaceMember.findUnique.mockResolvedValue({
+        id: 'm-1',
+        role: 'member',
+      });
+
+      await expect(
+        service.addAssignees(WS, 'task-1', USER, [OTHER]),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

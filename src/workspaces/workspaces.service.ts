@@ -64,8 +64,12 @@ export class WorkspacesService {
   async create(dto: CreateWorkspaceDto, userId: string): Promise<Workspace> {
     const slug = dto.slug?.trim() || this.slugify(dto.name) || 'workspace';
 
+    // Only live workspaces can conflict. Without the deletedAt filter a
+    // soft-deleted workspace kept reserving its own name forever: delete
+    // "Work", try to create "Work" again, and the user was told they already
+    // have one — pointing at a row they can no longer see.
     const memberships = await this.prisma.workspaceMember.findMany({
-      where: { userId },
+      where: { userId, workspace: { deletedAt: null } },
       include: { workspace: true },
     });
     const userSlugs = memberships.map((m) => m.workspace.slug);
@@ -94,7 +98,6 @@ export class WorkspacesService {
     });
     membershipCache.set(membershipKey(userId, workspace.id), {
       role: 'owner',
-      canSeeAllTasks: false,
     });
 
     await this.taskStatuses.seedDefaultsForWorkspace(workspace.id);
@@ -106,6 +109,16 @@ export class WorkspacesService {
     const memberships = await this.prisma.workspaceMember.findMany({
       where: { userId, workspace: { deletedAt: null } },
       include: { workspace: true },
+      // Without an explicit order Postgres returns these in whatever order it
+      // likes, and that changes as rows are updated. It matters more than it
+      // looks: WorkspaceContext falls back to workspaces[0] when there is no
+      // stored selection, so an unordered list meant a user with no saved
+      // workspace could land in a different one on each load, and the list
+      // reshuffled under them after every write.
+      orderBy: [
+        { workspace: { isPersonal: 'desc' } },
+        { workspace: { createdAt: 'asc' } },
+      ],
     });
     return memberships.map((m) => m.workspace);
   }
@@ -125,6 +138,25 @@ export class WorkspacesService {
     dto: UpdateWorkspaceDto,
   ): Promise<Workspace> {
     await this.findOne(id, userId);
+
+    // Renaming a workspace, changing its slug or flipping isPersonal are
+    // administrative acts, but this only checked membership — so any member
+    // could do all three, while deleting and inviting were already owner-only.
+    //
+    // isPersonal is the one that matters most: MeService picks the personal
+    // workspace by that flag and the rollup's creator branch is scoped to it,
+    // so flipping it changes what surfaces in other people's My Tasks.
+    const { role } = await assertMember(this.prisma, id, userId);
+    if (role !== 'owner' && role !== 'admin') {
+      throw new ForbiddenException(
+        'Only the workspace owner or an admin can update it',
+      );
+    }
+    if (dto.isPersonal !== undefined && role !== 'owner') {
+      throw new ForbiddenException(
+        'Only the workspace owner can change whether it is personal',
+      );
+    }
 
     const data: { name?: string; slug?: string; isPersonal?: boolean } = {};
     if (dto.name !== undefined) data.name = dto.name.trim();
@@ -149,6 +181,17 @@ export class WorkspacesService {
       where: { id },
       data: { deletedAt: new Date() },
     });
+
+    // assertMember caches membership for 60s. removeMember and updateMember
+    // both evict on change; deleting the workspace did not, so every member
+    // kept working access to a deleted workspace for up to a minute.
+    const members = await this.prisma.workspaceMember.findMany({
+      where: { workspaceId: id },
+      select: { userId: true },
+    });
+    for (const m of members) {
+      membershipCache.delete(membershipKey(m.userId, id));
+    }
   }
 
   // --- Member management ---
@@ -166,6 +209,10 @@ export class WorkspacesService {
           select: { id: true, email: true, name: true, avatarUrl: true },
         },
       },
+      // Same reason: unordered rows made the member list reshuffle between
+      // refetches. WorkspaceMember has no createdAt, so order by the member's
+      // email — stable, and a predictable alphabetical list to scan.
+      orderBy: [{ user: { email: 'asc' } }],
     }) as Promise<MemberWithUser[]>;
   }
 
@@ -290,10 +337,8 @@ export class WorkspacesService {
     targetUserId: string,
     dto: UpdateMemberDto,
   ): Promise<WorkspaceMember> {
-    if (dto.role === undefined && dto.canSeeAllTasks === undefined) {
-      throw new BadRequestException(
-        'Must provide at least one of: role, canSeeAllTasks',
-      );
+    if (dto.role === undefined) {
+      throw new BadRequestException('Must provide a role');
     }
 
     const { role: requesterRole } = await assertMember(
@@ -318,18 +363,11 @@ export class WorkspacesService {
 
     const updated = await this.prisma.workspaceMember.update({
       where: { userId_workspaceId: { userId: targetUserId, workspaceId } },
-      data: {
-        ...(dto.role !== undefined ? { role: dto.role } : {}),
-        ...(dto.canSeeAllTasks !== undefined
-          ? { canSeeAllTasks: dto.canSeeAllTasks }
-          : {}),
-      },
+      data: { role: dto.role },
     });
 
-    // Invalidate cache if role changed so the next request loads the new role
-    if (dto.role !== undefined) {
-      membershipCache.delete(membershipKey(targetUserId, workspaceId));
-    }
+    // Invalidate cache so the next request loads the new role
+    membershipCache.delete(membershipKey(targetUserId, workspaceId));
 
     return updated;
   }

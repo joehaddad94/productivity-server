@@ -97,10 +97,14 @@ describe('CalendarConnectionsService', () => {
           signOAuthState: (id: string) => string;
         }
       ).signOAuthState(USER);
-      // Replace last character to tamper with signature; pick a character
-      // guaranteed to differ so the test can't pass by coincidence
-      const lastChar = validState.slice(-1);
-      const tampered = validState.slice(0, -1) + (lastChar === 'x' ? 'y' : 'x');
+      // Tamper the FIRST character, not the last. Base64 carries redundant
+      // bits in its final character, so several different trailing characters
+      // decode to identical bytes — replacing the last one left the decoded
+      // signature unchanged often enough to make this test flaky. The first
+      // character always contributes a full byte.
+      const firstChar = validState.slice(0, 1);
+      const tampered =
+        (firstChar === 'x' ? 'y' : 'x') + validState.slice(1);
 
       expect(() => service.verifyOAuthState(tampered)).toThrow(
         BadRequestException,
@@ -290,6 +294,7 @@ describe('CalendarConnectionsService', () => {
       expect(prisma.calendarConnection.findMany).toHaveBeenCalledWith({
         where: { userId: USER },
         select: { id: true, provider: true, createdAt: true, expiresAt: true },
+        orderBy: { provider: 'asc' },
       });
     });
 

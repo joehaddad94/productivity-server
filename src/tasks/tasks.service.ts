@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { assertMember } from '../common/assert-member';
+import { assertMember, type WorkspaceRole } from '../common/assert-member';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Prisma, Task } from '@prisma/client';
@@ -52,12 +52,8 @@ export class TasksService {
     userId: string,
     query: QueryTaskDto,
   ): Promise<{ tasks: TaskWithDetails[]; total: number }> {
-    const { role, canSeeAllTasks } = await assertMember(
-      this.prisma,
-      workspaceId,
-      userId,
-    );
-    const visibility = buildTaskVisibilityWhere(userId, role, canSeeAllTasks);
+    const { role } = await assertMember(this.prisma, workspaceId, userId);
+    const visibility = buildTaskVisibilityWhere(userId, role);
 
     const where: Prisma.TaskWhereInput = {
       workspaceId,
@@ -131,8 +127,13 @@ export class TasksService {
 
     // Build initial assignee list:
     //   - subtask → inherit parent's assignees (preserve assignedById)
-    //   - explicit assigneeIds → owner/admin only, no self-assignment
+    //   - explicit assigneeIds → owner/admin may assign anyone; a plain member
+    //     may assign only themselves (assertCanAssign). Member self-assignment
+    //     is what lets the personal rollup pull team tasks into "My Tasks".
     let assigneeRows: { userId: string; assignedById: string }[] = [];
+    // Only assignees added explicitly on THIS task — not the ones inherited
+    // from a parent — trigger notifications and an "assigned" activity entry.
+    const explicitlyAssignedIds: string[] = [];
 
     if (dto.parentTaskId) {
       const parent = await this.prisma.task.findFirst({
@@ -147,17 +148,14 @@ export class TasksService {
     }
 
     if (dto.assigneeIds && dto.assigneeIds.length > 0) {
-      if (role !== 'owner' && role !== 'admin') {
-        throw new ForbiddenException(
-          'Only owner or admin can assign tasks',
-        );
-      }
+      this.assertCanAssign(role, userId, dto.assigneeIds);
       await this.assertUsersInWorkspace(workspaceId, dto.assigneeIds);
       const seen = new Set(assigneeRows.map((r) => r.userId));
       for (const uid of dto.assigneeIds) {
         if (!seen.has(uid)) {
           assigneeRows.push({ userId: uid, assignedById: userId });
           seen.add(uid);
+          explicitlyAssignedIds.push(uid);
         }
       }
     }
@@ -185,16 +183,14 @@ export class TasksService {
     // Fire-and-forget: log creation activity + assignment notifications
     void this.logActivity(created.id, userId, 'created', undefined, workspaceId);
 
-    if (assigneeRows.length > 0) {
-      const recipientIds = assigneeRows
-        .map((r) => r.userId)
-        .filter((uid) => uid !== userId);
+    if (explicitlyAssignedIds.length > 0) {
+      const recipientIds = explicitlyAssignedIds.filter((uid) => uid !== userId);
       if (recipientIds.length > 0) {
         void this.notifyAssigned(workspaceId, created.id, created.title, recipientIds);
       }
-      for (const row of assigneeRows) {
+      for (const uid of explicitlyAssignedIds) {
         void this.logActivity(created.id, userId, 'assigned', {
-          assigneeId: row.userId,
+          assigneeId: uid,
         }, workspaceId);
       }
     }
@@ -240,6 +236,26 @@ export class TasksService {
     );
   }
 
+  /**
+   * Assignment permission: owner/admin may assign anyone; a plain member may
+   * assign *only themselves* (self-assignment — required so the personal rollup
+   * can pull a member's own team tasks into their day). See
+   * docs/task-model-and-rollup.md §6.2.
+   */
+  private assertCanAssign(
+    role: WorkspaceRole,
+    requesterId: string,
+    targetUserIds: string[],
+  ): void {
+    if (role === 'owner' || role === 'admin') return;
+    const onlySelf = targetUserIds.every((id) => id === requesterId);
+    if (!onlySelf) {
+      throw new ForbiddenException(
+        'Members can only assign tasks to themselves',
+      );
+    }
+  }
+
   private async assertUsersInWorkspace(
     workspaceId: string,
     userIds: string[],
@@ -265,9 +281,7 @@ export class TasksService {
       workspaceId,
       requesterId,
     );
-    if (role !== 'owner' && role !== 'admin') {
-      throw new ForbiddenException('Only owner or admin can assign tasks');
-    }
+    this.assertCanAssign(role, requesterId, userIds);
     await this.assertUsersInWorkspace(workspaceId, userIds);
 
     const task = await this.prisma.task.findFirst({
@@ -293,7 +307,12 @@ export class TasksService {
     });
 
     if (newAssigneeIds.length > 0) {
-      void this.notifyAssigned(workspaceId, taskId, task.title, newAssigneeIds);
+      // Don't notify people for assigning themselves (members self-assign to
+      // pull tasks into their personal rollup) — matches create().
+      const recipientIds = newAssigneeIds.filter((uid) => uid !== requesterId);
+      if (recipientIds.length > 0) {
+        void this.notifyAssigned(workspaceId, taskId, task.title, recipientIds);
+      }
       const assigneeUsers = await this.prisma.user.findMany({
         where: { id: { in: newAssigneeIds } },
         select: { id: true, name: true, email: true },
@@ -322,9 +341,13 @@ export class TasksService {
       workspaceId,
       requesterId,
     );
-    if (role !== 'owner' && role !== 'admin') {
+    // Owner/admin may remove anyone; a plain member may remove only
+    // themselves — the mirror of self-assignment (assertCanAssign), so a
+    // member who self-assigned a task can also drop it without an admin.
+    const isPrivileged = role === 'owner' || role === 'admin';
+    if (!isPrivileged && targetUserId !== requesterId) {
       throw new ForbiddenException(
-        'Only owner or admin can remove assignees',
+        'Members can only remove themselves from a task',
       );
     }
 
@@ -390,12 +413,8 @@ export class TasksService {
     id: string,
     userId: string,
   ): Promise<TaskWithDetails> {
-    const { role, canSeeAllTasks } = await assertMember(
-      this.prisma,
-      workspaceId,
-      userId,
-    );
-    const visibility = buildTaskVisibilityWhere(userId, role, canSeeAllTasks);
+    const { role } = await assertMember(this.prisma, workspaceId, userId);
+    const visibility = buildTaskVisibilityWhere(userId, role);
 
     const task = await this.prisma.task.findFirst({
       where: { id, workspaceId, deletedAt: null, ...visibility },
@@ -623,7 +642,10 @@ export class TasksService {
         data: task.assignees.map((a) => ({
           taskId: created.id,
           userId: a.userId,
-          assignedById: task.creatorId,
+          // Preserve the original assigner — visibility and reminders key off
+          // assignedById, so overwriting it with the creator would drop the
+          // real assigner from every future recurring instance.
+          assignedById: a.assignedById,
         })),
       });
     }
@@ -687,12 +709,8 @@ export class TasksService {
     userId: string,
     ids: string[],
   ): Promise<void> {
-    const { role, canSeeAllTasks } = await assertMember(
-      this.prisma,
-      workspaceId,
-      userId,
-    );
-    const visibility = buildTaskVisibilityWhere(userId, role, canSeeAllTasks);
+    const { role } = await assertMember(this.prisma, workspaceId, userId);
+    const visibility = buildTaskVisibilityWhere(userId, role);
 
     // Only reorder tasks the user can actually see
     const visibleTasks = await this.prisma.task.findMany({
@@ -735,12 +753,8 @@ export class TasksService {
     userId: string,
     dto: BulkTaskDto,
   ): Promise<{ affected: number }> {
-    const { role, canSeeAllTasks } = await assertMember(
-      this.prisma,
-      workspaceId,
-      userId,
-    );
-    const visibility = buildTaskVisibilityWhere(userId, role, canSeeAllTasks);
+    const { role } = await assertMember(this.prisma, workspaceId, userId);
+    const visibility = buildTaskVisibilityWhere(userId, role);
 
     const tasks = await this.prisma.task.findMany({
       where: {

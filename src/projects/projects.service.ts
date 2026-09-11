@@ -30,7 +30,17 @@ export class ProjectsService {
     const [projects, total] = await Promise.all([
       this.prisma.project.findMany({
         where,
-        include: { _count: { select: { notes: true, tasks: true } } },
+        include: {
+        _count: {
+          select: {
+            notes: true,
+            // Tasks are soft-deleted, and an unfiltered _count counts every
+            // related row — so deleted tasks kept inflating the project's
+            // badge. Notes are hard-deleted and need no filter.
+            tasks: { where: { deletedAt: null } },
+          },
+        },
+      },
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip,
@@ -68,7 +78,17 @@ export class ProjectsService {
 
     const project = await this.prisma.project.findFirst({
       where: { id, workspaceId, deletedAt: null },
-      include: { _count: { select: { notes: true, tasks: true } } },
+      include: {
+        _count: {
+          select: {
+            notes: true,
+            // Tasks are soft-deleted, and an unfiltered _count counts every
+            // related row — so deleted tasks kept inflating the project's
+            // badge. Notes are hard-deleted and need no filter.
+            tasks: { where: { deletedAt: null } },
+          },
+        },
+      },
     });
     if (!project) throw new NotFoundException('Project not found');
     return project as ProjectWithCount;
@@ -92,15 +112,41 @@ export class ProjectsService {
         ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.color !== undefined ? { color: dto.color } : {}),
       },
-      include: { _count: { select: { notes: true, tasks: true } } },
+      include: {
+        _count: {
+          select: {
+            notes: true,
+            // Tasks are soft-deleted, and an unfiltered _count counts every
+            // related row — so deleted tasks kept inflating the project's
+            // badge. Notes are hard-deleted and need no filter.
+            tasks: { where: { deletedAt: null } },
+          },
+        },
+      },
     }) as unknown as ProjectWithCount;
   }
 
   async remove(workspaceId: string, id: string, userId: string): Promise<void> {
     await this.findOne(workspaceId, id, userId);
-    await this.prisma.project.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+
+    // The schema declares onDelete: SetNull for tasks and notes, but that only
+    // fires on a real row delete — a soft delete left every task and note
+    // pointing at a project that list() now filters out, so they displayed a
+    // project absent from every picker and openTasksByProject keyed on an id
+    // that no longer resolved. Do explicitly what the hard delete would have.
+    await this.prisma.$transaction([
+      this.prisma.project.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      }),
+      this.prisma.task.updateMany({
+        where: { projectId: id, workspaceId },
+        data: { projectId: null },
+      }),
+      this.prisma.note.updateMany({
+        where: { projectId: id, workspaceId },
+        data: { projectId: null },
+      }),
+    ]);
   }
 }

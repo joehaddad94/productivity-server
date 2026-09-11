@@ -4,6 +4,7 @@ import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { SentryGlobalFilter } from '@sentry/nestjs/setup';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { trace } from '@opentelemetry/api';
 import type { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
@@ -21,6 +22,7 @@ function normalizeRoute(url: string): string {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const httpLogger = new Logger('HTTP');
+  const logger = new Logger('Bootstrap');
 
   app.use((req: Request, res: Response, next: NextFunction) => {
     const { method, url } = req;
@@ -48,10 +50,51 @@ async function bootstrap() {
     next();
   });
 
+  // Security response headers. `contentSecurityPolicy` is disabled because
+  // this process serves JSON and, outside production, the Swagger UI — whose
+  // inline scripts a default CSP would block. The frontend sets its own CSP.
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+      // The OAuth callbacks redirect back to the frontend origin.
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
+
   app.use(cookieParser());
 
+  // Allowlist, not reflection.
+  //
+  // `origin: true` reflects whatever Origin the request carries. Combined with
+  // `credentials: true` and an auth cookie that is SameSite=None in production,
+  // that let ANY site a signed-in user visited call this API with their cookie
+  // attached and read the response.
+  //
+  // Requests with no Origin header (server-to-server, curl, health checks, and
+  // the Next.js /api proxy) are still allowed — the header is only present on
+  // cross-origin browser requests, which are exactly the ones being gated.
+  // Falls back to APP_URL, which production already sets to the frontend
+  // origin for magic links, so a deployment that never sets CORS_ORIGINS still
+  // allows its own frontend instead of locking it out.
+  const allowedOrigins = (
+    process.env.CORS_ORIGINS ??
+    process.env.APP_URL ??
+    'http://localhost:3000,http://localhost:5173'
+  )
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+  logger.log(`CORS allowlist: ${allowedOrigins.join(', ')}`);
+
   app.enableCors({
-    origin: true, // or set to your frontend origin(s), e.g. ['http://localhost:5173']
+    origin(origin, callback) {
+      // Deny by omitting the header rather than throwing: the browser blocks
+      // the response either way, and throwing turns every probe into a 500
+      // that shows up as a server error in the logs and in Sentry.
+      callback(null, !origin || allowedOrigins.includes(origin));
+    },
     credentials: true,
   });
 
@@ -69,14 +112,23 @@ async function bootstrap() {
     }),
   );
 
-  const config = new DocumentBuilder()
-    .setTitle('Tasky API')
-    .setDescription('API for Tasky (notes, tasks, workspaces)')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  // The full API schema is an internal document: it enumerates every route,
+  // parameter and shape, which is a map for anyone probing the service. Serve
+  // it outside production only, or when explicitly switched on.
+  const swaggerEnabled =
+    process.env.ENABLE_SWAGGER === 'true' ||
+    process.env.NODE_ENV !== 'production';
+
+  if (swaggerEnabled) {
+    const config = new DocumentBuilder()
+      .setTitle('Tasky API')
+      .setDescription('API for Tasky (notes, tasks, workspaces)')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api', app, document);
+  }
 
   await app.listen(process.env.PORT ?? 8000);
 

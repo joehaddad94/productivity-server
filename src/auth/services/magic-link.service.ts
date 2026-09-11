@@ -2,9 +2,24 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 const MAGIC_LINK_EXPIRES_MS = 15 * 60 * 1000; // 15 minutes
+
+/**
+ * Magic-link tokens are bearer credentials: whoever holds one can sign in as
+ * that email. They were stored verbatim, so anyone who could read the table —
+ * a backup, a replica, a support query, a leaked log — held a working login
+ * for every link still in flight.
+ *
+ * Store only the hash and email the raw value, so the database never contains
+ * anything that can be used to authenticate. A plain SHA-256 is the right
+ * tool here rather than a password KDF: the input is 256 bits of CSPRNG
+ * output, so there is nothing to brute force and nothing to salt.
+ */
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
 
 export interface ConsumedToken {
   email: string;
@@ -29,7 +44,7 @@ export class MagicLinkService {
       data: {
         email: normalized,
         name: name ?? null,
-        token,
+        token: hashToken(token),
         expiresAt,
       } as Prisma.VerificationTokenCreateInput,
     });
@@ -45,7 +60,7 @@ export class MagicLinkService {
    */
   async consumeToken(token: string): Promise<ConsumedToken> {
     const record = await this.prisma.verificationToken.findUnique({
-      where: { token },
+      where: { token: hashToken(token) },
     });
     if (!record) {
       throw new BadRequestException('Invalid or expired link');

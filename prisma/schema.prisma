@@ -128,7 +128,6 @@ model WorkspaceMember {
   userId         String  @map("user_id")
   workspaceId    String  @map("workspace_id")
   role           String  @default("member")
-  canSeeAllTasks Boolean @default(false) @map("can_see_all_tasks")
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -227,11 +226,15 @@ model Note {
   taskId       String?   @map("task_id")
   title        String
   content      String?   @map("content")
+  /// Plain-text mirror of `content`, maintained on write. Search targets this
+  /// rather than the HTML, which otherwise matched tags and base64 payloads.
+  contentText  String?   @map("content_text")
   tags         String[]  @default([])
   status       String?
   completedAt  DateTime? @map("completed_at")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
 
   workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   project   Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
@@ -241,6 +244,7 @@ model Note {
   @@index([workspaceId])
   @@index([workspaceId, projectId])
   @@index([workspaceId, updatedAt])
+  @@index([workspaceId, deletedAt])
   @@map("notes")
 }
 
